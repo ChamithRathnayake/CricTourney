@@ -1846,6 +1846,9 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
     }
     return false;
   })();
+
+  const isOversLimitMet = legalBallsCount >= oversLimit * 6;
+  const isScoringLocked = isTargetChased || isOversLimitMet;
   
   // Bowler delivery count mapping
   const getBowlerBalls = (playerId: string) => {
@@ -2443,6 +2446,11 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
 
   const recordWicket = async () => {
     if (!selectedMatch || !activeInning) return;
+    if (legalBallsCount >= oversLimit * 6) {
+      setScorerErrorMsg('Overs limit reached for this inning. Please declare/end the inning.');
+      setShowScorerErrorModal(true);
+      return;
+    }
     try {
       const isRunOut = dismissalType === 'Run Out';
       let runsVal = isRunOut 
@@ -5061,6 +5069,20 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                   </div>
                 )}
 
+                {!isTargetChased && isOversLimitMet && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 px-4 py-3 rounded-xl text-xs font-bold flex flex-col sm:flex-row items-center justify-between gap-3 animate-pulse mb-6">
+                    <span className="flex items-center gap-1.5">
+                      ⚠️ Overs Limit Reached! Inning is complete. Please declare or switch innings. To edit, click Undo.
+                    </span>
+                    <button 
+                      onClick={undoLastBall}
+                      className="w-full sm:w-auto px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg font-black uppercase text-[10px] transition-colors cursor-pointer text-center"
+                    >
+                      Undo Last Ball
+                    </button>
+                  </div>
+                )}
+
                 <div>
                   <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Record Score</span>
                   <h4 className="text-sm font-extrabold text-slate-300 mt-1">Runs scored off bat (legal ball):</h4>
@@ -5069,7 +5091,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                       <button
                         key={run}
                         onClick={() => recordBall(run)}
-                        disabled={isTargetChased}
+                        disabled={isScoringLocked}
                         className="py-4 bg-slate-950/40 hover:bg-emerald-500/10 hover:border-emerald-500/30 border border-slate-800 text-sm font-extrabold text-slate-200 rounded-xl cursor-pointer shadow-sm active:scale-95 transition-all disabled:opacity-40 disabled:hover:bg-slate-950/40 disabled:hover:border-slate-800 disabled:cursor-not-allowed"
                       >
                         {run} {run === 1 ? 'Run' : 'Runs'}
@@ -5098,7 +5120,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                                 setExtraRuns(0);
                               }
                             }}
-                            disabled={isTargetChased}
+                            disabled={isScoringLocked}
                             className={`flex-1 min-w-[70px] shrink-0 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                               selectedExtra === type
                                 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
@@ -5125,7 +5147,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                               key={run}
                               type="button"
                               onClick={() => setExtraRuns(run)}
-                              disabled={isTargetChased}
+                              disabled={isScoringLocked}
                               className={`flex-1 py-2 rounded-lg text-xs font-black border transition-all cursor-pointer ${
                                 extraRuns === run
                                   ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
@@ -5150,7 +5172,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                                 key={type}
                                 type="button"
                                 onClick={() => setNoBallRunsType(type)}
-                                disabled={isTargetChased}
+                                disabled={isScoringLocked}
                                 className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
                                   noBallRunsType === type
                                     ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
@@ -5181,7 +5203,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                           }
                           recordBall(total, true, selectedExtra, runsOffBat);
                         }}
-                        disabled={isTargetChased}
+                        disabled={isScoringLocked}
                         className="w-full py-2.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/40 text-[11px] font-bold text-amber-400 uppercase tracking-wider rounded-xl cursor-pointer transition-all active:scale-[0.98] disabled:opacity-40 disabled:hover:bg-amber-500/10 disabled:hover:border-amber-500/20 disabled:cursor-not-allowed"
                       >
                         {selectedMatch.special_extras && selectedExtra === 'Wide' ? (
@@ -5202,7 +5224,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Wickets & Dismissals</h4>
                     <button
                       onClick={handleWicketClick}
-                      disabled={isTargetChased}
+                      disabled={isScoringLocked}
                       className="w-full py-8 mt-3 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/40 text-sm font-extrabold text-rose-400 rounded-xl flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all disabled:opacity-40 disabled:hover:bg-rose-500/10 disabled:hover:border-rose-500/20 disabled:cursor-not-allowed"
                     >
                       Record Wicket
