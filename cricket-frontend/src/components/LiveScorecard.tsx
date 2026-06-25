@@ -1272,7 +1272,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
           const oversRemainingStr = `${Math.floor(ballsRemaining / 6)}.${ballsRemaining % 6}`;
 
           return (
-            <div className="mt-1 text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/20 flex items-center justify-between gap-1">
+            <div className="mt-1 text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/20 flex flex-wrap items-center justify-between gap-2">
               <span>🎯 Target: <span className="font-extrabold text-white">{target}</span></span>
               <span>Need {runsNeeded} runs from {ballsRemaining} balls ({oversRemainingStr} ov)</span>
             </div>
@@ -2098,18 +2098,18 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
           <div className="w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl relative flex flex-col max-h-[95svh] sm:max-h-[90svh] overflow-hidden my-auto sm:my-8">
 
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-800/60 flex items-center justify-between shrink-0">
-              <div>
+            <div className="p-4 sm:p-5 border-b border-slate-800/60 flex items-center justify-between shrink-0 gap-4">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-slate-500 font-bold uppercase">{selectedPopupMatch.stage}</span>
                   {selectedPopupMatch.match_time && (
-                    <span className="flex items-center gap-1 text-[10px] text-slate-400 font-semibold bg-slate-955/40 px-2 py-0.5 rounded border border-slate-850">
+                    <span className="flex items-center gap-1 text-[10px] text-slate-400 font-semibold bg-slate-955/40 px-2 py-0.5 rounded border border-slate-850 shrink-0">
                       <Clock className="w-3 h-3 text-emerald-500/80" />
                       {formatMatchTime(selectedPopupMatch.match_time)}
                     </span>
                   )}
                 </div>
-                <h3 className="text-sm sm:text-base font-extrabold text-slate-200 mt-1">
+                <h3 className="text-sm sm:text-base font-extrabold text-slate-200 mt-1 truncate">
                   {getTeam(selectedPopupMatch.team1)?.name} vs {getTeam(selectedPopupMatch.team2)?.name}
                 </h3>
               </div>
@@ -2122,7 +2122,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
             </div>
 
             {/* Modal Scrollable Body */}
-            <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-6">
+            <div className="p-4 sm:p-6 overflow-y-auto overflow-x-hidden flex-1 space-y-6">
 
               {/* Suspended Alert Banner */}
               {selectedPopupMatch.delay_reason && (
@@ -2154,14 +2154,14 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
                         {getTeamPlayers(selectedPopupMatch.team1).map(p => (
                           <div key={p.id} className="flex items-center gap-2 p-2 bg-slate-950/20 border border-slate-900/60 rounded-xl text-xs">
                             {p.photo ? (
-                              <img src={getFileUrl('players', p.id, p.photo)} className="w-6 h-6 rounded-full object-cover" alt="" />
+                              <img src={getFileUrl('players', p.id, p.photo)} className="w-6 h-6 rounded-full object-cover shadow-sm shrink-0" alt="" />
                             ) : (
-                              <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[8px] font-bold text-slate-500">
+                              <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[8px] font-bold text-slate-500 shrink-0">
                                 {p.name.substring(0, 2).toUpperCase()}
                               </div>
                             )}
-                            <span className="text-slate-300 font-medium">{formatPlayerName(p)}</span>
-                            <span className="text-[9px] text-slate-500 font-bold uppercase ml-auto">{p.role}</span>
+                            <span className="text-slate-300 font-medium truncate flex-1 min-w-0">{formatPlayerName(p)}</span>
+                            <span className="text-[9px] text-slate-500 font-bold uppercase ml-auto shrink-0">{p.role}</span>
                           </div>
                         ))}
                       </div>
@@ -2176,14 +2176,14 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
                         {getTeamPlayers(selectedPopupMatch.team2).map(p => (
                           <div key={p.id} className="flex items-center gap-2 p-2 bg-slate-950/20 border border-slate-900/60 rounded-xl text-xs">
                             {p.photo ? (
-                              <img src={getFileUrl('players', p.id, p.photo)} className="w-6 h-6 rounded-full object-cover" alt="" />
+                              <img src={getFileUrl('players', p.id, p.photo)} className="w-6 h-6 rounded-full object-cover shadow-sm shrink-0" alt="" />
                             ) : (
-                              <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[8px] font-bold text-slate-500">
+                              <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[8px] font-bold text-slate-500 shrink-0">
                                 {p.name.substring(0, 2).toUpperCase()}
                               </div>
                             )}
-                            <span className="text-slate-300 font-medium">{formatPlayerName(p)}</span>
-                            <span className="text-[9px] text-slate-500 font-bold uppercase ml-auto">{p.role}</span>
+                            <span className="text-slate-300 font-medium truncate flex-1 min-w-0">{formatPlayerName(p)}</span>
+                            <span className="text-[9px] text-slate-500 font-bold uppercase ml-auto shrink-0">{p.role}</span>
                           </div>
                         ))}
                       </div>
@@ -2466,14 +2466,14 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
                                       {playing.map(p => (
                                         <div key={p.id} className="flex items-center gap-2 p-2 bg-slate-950/20 border border-slate-900/60 rounded-xl text-xs">
                                           {p.photo ? (
-                                            <img src={getFileUrl('players', p.id, p.photo)} className="w-6 h-6 rounded-full object-cover" alt="" />
+                                            <img src={getFileUrl('players', p.id, p.photo)} className="w-6 h-6 rounded-full object-cover shadow-sm shrink-0" alt="" />
                                           ) : (
-                                            <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[8px] font-bold text-slate-500">
+                                            <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[8px] font-bold text-slate-500 shrink-0">
                                               {p.name.substring(0, 2).toUpperCase()}
                                             </div>
                                           )}
-                                          <span className="text-slate-350 font-medium">{formatPlayerName(p, selectedPopupMatch.team1)}</span>
-                                          <span className="text-[9px] text-slate-500 font-bold uppercase ml-auto">{p.role}</span>
+                                          <span className="text-slate-350 font-medium truncate flex-1 min-w-0">{formatPlayerName(p, selectedPopupMatch.team1)}</span>
+                                          <span className="text-[9px] text-slate-500 font-bold uppercase ml-auto shrink-0">{p.role}</span>
                                         </div>
                                       ))}
                                     </div>
@@ -2489,14 +2489,14 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
                                       {bench.map(p => (
                                         <div key={p.id} className="flex items-center gap-2 p-2 bg-slate-950/10 border border-slate-900/40 rounded-xl text-xs opacity-65">
                                           {p.photo ? (
-                                            <img src={getFileUrl('players', p.id, p.photo)} className="w-6 h-6 rounded-full object-cover" alt="" />
+                                            <img src={getFileUrl('players', p.id, p.photo)} className="w-6 h-6 rounded-full object-cover shadow-sm shrink-0" alt="" />
                                           ) : (
-                                            <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[8px] font-bold text-slate-500">
+                                            <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[8px] font-bold text-slate-500 shrink-0">
                                               {p.name.substring(0, 2).toUpperCase()}
                                             </div>
                                           )}
-                                          <span className="text-slate-400 font-medium">{formatPlayerName(p, selectedPopupMatch.team1)}</span>
-                                          <span className="text-[9px] text-slate-500 font-bold uppercase ml-auto">{p.role}</span>
+                                          <span className="text-slate-400 font-medium truncate flex-1 min-w-0">{formatPlayerName(p, selectedPopupMatch.team1)}</span>
+                                          <span className="text-[9px] text-slate-500 font-bold uppercase ml-auto shrink-0">{p.role}</span>
                                         </div>
                                       ))}
                                     </div>
@@ -2532,14 +2532,14 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
                                       {playing.map(p => (
                                         <div key={p.id} className="flex items-center gap-2 p-2 bg-slate-950/20 border border-slate-900/60 rounded-xl text-xs">
                                           {p.photo ? (
-                                            <img src={getFileUrl('players', p.id, p.photo)} className="w-6 h-6 rounded-full object-cover" alt="" />
+                                            <img src={getFileUrl('players', p.id, p.photo)} className="w-6 h-6 rounded-full object-cover shadow-sm shrink-0" alt="" />
                                           ) : (
-                                            <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[8px] font-bold text-slate-500">
+                                            <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[8px] font-bold text-slate-500 shrink-0">
                                               {p.name.substring(0, 2).toUpperCase()}
                                             </div>
                                           )}
-                                          <span className="text-slate-350 font-medium">{formatPlayerName(p, selectedPopupMatch.team2)}</span>
-                                          <span className="text-[9px] text-slate-500 font-bold uppercase ml-auto">{p.role}</span>
+                                          <span className="text-slate-350 font-medium truncate flex-1 min-w-0">{formatPlayerName(p, selectedPopupMatch.team2)}</span>
+                                          <span className="text-[9px] text-slate-500 font-bold uppercase ml-auto shrink-0">{p.role}</span>
                                         </div>
                                       ))}
                                     </div>
@@ -2555,14 +2555,14 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
                                       {bench.map(p => (
                                         <div key={p.id} className="flex items-center gap-2 p-2 bg-slate-950/10 border border-slate-900/40 rounded-xl text-xs opacity-65">
                                           {p.photo ? (
-                                            <img src={getFileUrl('players', p.id, p.photo)} className="w-6 h-6 rounded-full object-cover" alt="" />
+                                            <img src={getFileUrl('players', p.id, p.photo)} className="w-6 h-6 rounded-full object-cover shadow-sm shrink-0" alt="" />
                                           ) : (
-                                            <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[8px] font-bold text-slate-500">
+                                            <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[8px] font-bold text-slate-500 shrink-0">
                                               {p.name.substring(0, 2).toUpperCase()}
                                             </div>
                                           )}
-                                          <span className="text-slate-400 font-medium">{formatPlayerName(p, selectedPopupMatch.team2)}</span>
-                                          <span className="text-[9px] text-slate-550 font-bold uppercase ml-auto">{p.role}</span>
+                                          <span className="text-slate-400 font-medium truncate flex-1 min-w-0">{formatPlayerName(p, selectedPopupMatch.team2)}</span>
+                                          <span className="text-[9px] text-slate-550 font-bold uppercase ml-auto shrink-0">{p.role}</span>
                                         </div>
                                       ))}
                                     </div>
@@ -2663,16 +2663,16 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
             <div className="w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl relative flex flex-col max-h-[95svh] sm:max-h-[90svh] overflow-hidden my-auto sm:my-8">
               
               {/* Modal Header */}
-              <div className="p-4 sm:p-5 border-b border-slate-800/60 flex items-center justify-between shrink-0">
-                <div>
+              <div className="p-4 sm:p-5 border-b border-slate-800/60 flex items-center justify-between shrink-0 gap-4">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Match Analytics</span>
-                    <span className="flex items-center gap-1 text-[10px] text-slate-400 font-semibold bg-slate-955/40 px-2 py-0.5 rounded border border-slate-850">
+                    <span className="flex items-center gap-1 text-[10px] text-slate-400 font-semibold bg-slate-955/40 px-2 py-0.5 rounded border border-slate-850 shrink-0">
                       <Clock className="w-3 h-3 text-emerald-500/80" />
                       {formatMatchTime(selectedAnalyticsMatch.match_time)}
                     </span>
                   </div>
-                  <h3 className="text-sm sm:text-base font-extrabold text-slate-200 mt-1">
+                  <h3 className="text-sm sm:text-base font-extrabold text-slate-200 mt-1 truncate">
                     {team1?.name} vs {team2?.name}
                   </h3>
                 </div>
@@ -2685,44 +2685,44 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
               </div>
 
               {/* Modal Tabs */}
-              <div className="px-4 py-2 bg-slate-950/30 border-b border-slate-800/40 flex gap-2 shrink-0">
+              <div className="px-4 py-2 bg-slate-950/30 border-b border-slate-800/40 flex gap-2 shrink-0 overflow-x-auto scrollbar-none">
                 <button
                   onClick={() => setAnalyticsTab('worm')}
-                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  className={`flex-1 min-w-[90px] py-2 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     analyticsTab === 'worm'
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/25 shadow-sm'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
                   }`}
                 >
                   <TrendingUp className="w-3.5 h-3.5" />
-                  <span>Worm Graph</span>
+                  <span>Worm<span className="hidden sm:inline"> Graph</span></span>
                 </button>
                 <button
                   onClick={() => setAnalyticsTab('stats')}
-                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  className={`flex-1 min-w-[90px] py-2 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     analyticsTab === 'stats'
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/25 shadow-sm'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
                   }`}
                 >
                   <BarChart2 className="w-3.5 h-3.5" />
-                  <span>Statistics</span>
+                  <span><span className="sm:hidden">Stats</span><span className="hidden sm:inline">Statistics</span></span>
                 </button>
                 <button
                   onClick={() => setAnalyticsTab('partnerships')}
-                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  className={`flex-1 min-w-[90px] py-2 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     analyticsTab === 'partnerships'
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/25 shadow-sm'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
                   }`}
                 >
                   <Users className="w-3.5 h-3.5" />
-                  <span>Partnerships</span>
+                  <span><span className="sm:hidden">Partners</span><span className="hidden sm:inline">Partnerships</span></span>
                 </button>
               </div>
 
               {/* Modal Scrollable Body */}
-              <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-6">
+              <div className="p-4 sm:p-6 overflow-y-auto overflow-x-hidden flex-1 space-y-6">
                 
                 {/* WORM GRAPH VIEW */}
                 {analyticsTab === 'worm' && (
@@ -2740,7 +2740,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
                         </div>
                       ) : (
                         <div className="w-full overflow-x-auto scrollbar-none">
-                          <svg viewBox="0 0 500 300" className="w-full min-w-[450px] h-auto overflow-visible select-none">
+                          <svg viewBox="0 0 500 300" className="w-full h-auto overflow-visible select-none">
                             {/* Gridlines */}
                             {Array.from({ length: 6 }).map((_, idx) => {
                               const y = 20 + (idx * 245) / 5;

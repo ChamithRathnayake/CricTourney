@@ -4610,7 +4610,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
               <div className="sticky top-2 z-30 glass-panel p-3 sm:p-4 rounded-2xl border border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/90 backdrop-blur-md shadow-xl">
                 <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto gap-4">
                   <div>
-                    <span className="text-[9px] text-slate-500 font-bold uppercase flex items-center gap-2 block">
+                    <span className="text-[9px] text-slate-500 font-bold uppercase flex flex-wrap items-center gap-2">
                       <span>{selectedMatch.stage}</span>
                       {innings.length === 2 && activeInning.id === innings[1].id && (() => {
                         const target = innings[0].total_runs + 1;
