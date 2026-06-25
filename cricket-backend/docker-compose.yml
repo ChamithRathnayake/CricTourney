@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  crictourney-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cricket-backend-crictourney:latest
+    container_name: crictourney-backend
+    ports:
+      # Map PocketBase's port 8090 to host port 8080 on localhost (127.0.0.1) only.
+      # This secures the database server so only Nginx on the host can access it directly.
+      - "127.0.0.1:8080:8090"
+    volumes:
+      # Mounts the host's user home directory '~/pb_data' to '/pb/pb_data' inside the container.
+      # This persists SQLite database records, migration logs, and uploaded logos/photos.
+      - ~/pb_data:/pb/pb_data
+    restart: always
