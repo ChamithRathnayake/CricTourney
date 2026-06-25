@@ -1840,7 +1840,8 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
 
   const isTargetChased = (() => {
     if (selectedMatch && innings.length === 2 && activeInning && activeInning.id === innings[1].id) {
-      const firstInningRuns = innings[0].total_runs;
+      const firstInningDeliveries = deliveries.filter(d => d.inning === innings[0].id);
+      const firstInningRuns = firstInningDeliveries.reduce((sum, d) => sum + (d.runs || 0), 0);
       return totalRuns > firstInningRuns;
     }
     return false;
@@ -2658,16 +2659,18 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
             setSuccessMsg('First inning complete. Setup the second inning!');
           } else {
             // Both innings done - complete match
-            const firstInning = innings[0];
-            const secondInning = innings[1];
+            const firstInningDeliveries = deliveries.filter(d => d.inning === innings[0].id);
+            const secondInningDeliveries = deliveries.filter(d => d.inning === innings[1].id);
+            const firstInningRuns = firstInningDeliveries.reduce((sum, d) => sum + (d.runs || 0), 0);
+            const secondInningRuns = secondInningDeliveries.reduce((sum, d) => sum + (d.runs || 0), 0);
 
             let matchWinner = '';
-            if (firstInning.total_runs > secondInning.total_runs) {
-              matchWinner = firstInning.batting_team;
-            } else if (secondInning.total_runs > firstInning.total_runs) {
-              matchWinner = secondInning.batting_team;
+            if (firstInningRuns > secondInningRuns) {
+              matchWinner = innings[0].batting_team;
+            } else if (secondInningRuns > firstInningRuns) {
+              matchWinner = innings[1].batting_team;
             } else {
-              matchWinner = secondInning.batting_team;
+              matchWinner = innings[1].batting_team;
             }
 
             await pb.collection('matches').update(selectedMatch.id, {
@@ -4613,7 +4616,9 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                     <span className="text-[9px] text-slate-500 font-bold uppercase flex flex-wrap items-center gap-2">
                       <span>{selectedMatch.stage}</span>
                       {innings.length === 2 && activeInning.id === innings[1].id && (() => {
-                        const target = innings[0].total_runs + 1;
+                        const firstInningDeliveries = deliveries.filter(d => d.inning === innings[0].id);
+                        const firstInningRuns = firstInningDeliveries.reduce((sum, d) => sum + (d.runs || 0), 0);
+                        const target = firstInningRuns + 1;
                         const needed = target - totalRuns;
                         const ballsRemaining = Math.max(0, ((selectedMatch.overs_limit || 5) * 6) - legalBallsCount);
                         const oversRemainingStr = `${Math.floor(ballsRemaining / 6)}.${ballsRemaining % 6}`;
@@ -5011,7 +5016,8 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                 {activeInning && inningDeliveries.length > 0 && (() => {
                   let isComplete = selectedMatch.status === 'Completed' || totalWickets >= 10 || legalBallsCount >= oversLimit * 6;
                   if (innings.length === 2 && activeInning.id === innings[1].id) {
-                    const firstInningRuns = innings[0].total_runs;
+                    const firstInningDeliveries = deliveries.filter(d => d.inning === innings[0].id);
+                    const firstInningRuns = firstInningDeliveries.reduce((sum, d) => sum + (d.runs || 0), 0);
                     if (totalRuns > firstInningRuns) {
                       isComplete = true;
                     }

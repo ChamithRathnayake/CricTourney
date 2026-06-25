@@ -21,13 +21,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   const role = getUserRole();
 
   const tabs = [
-    { id: 'dashboard', label: 'Live', icon: Activity },
-    { id: 'bracket', label: 'Knockout', icon: GitBranch },
-    { id: 'stats', label: 'Stats', icon: BarChart3 },
+    { id: 'dashboard', label: 'Live Dashboard', icon: Activity },
+    { id: 'bracket', label: 'Knockout Bracket', icon: GitBranch },
+    { id: 'stats', label: 'Stats Board', icon: BarChart3 },
     { id: 'fantasy', label: 'Fantasy League', icon: Sparkles },
-    { id: 'news', label: 'News', icon: Newspaper },
+    { id: 'news', label: 'News & Gallery', icon: Newspaper },
     ...(role === 'superuser' ? [{ id: 'display', label: 'Scoreboard', icon: Monitor }] : []),
-    { id: 'admin', label: 'Admin', icon: Lock },
+    { id: 'admin', label: 'Admin Scorer', icon: Lock },
   ];
 
   return (

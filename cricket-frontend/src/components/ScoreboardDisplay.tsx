@@ -246,7 +246,10 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
     const bowler = currentBowlerId ? getPlayer(currentBowlerId) : null;
 
     // Calculate target and balls remaining
-    const firstInningRuns = inning1 ? inning1.total_runs : 0;
+    const inning1Deliveries = inning1 ? allDeliveries.filter(d => d.inning === inning1.id) : [];
+    const firstInningRuns = inning1Deliveries.reduce((sum, d) => sum + (d.runs || 0), 0);
+    const activeInningRuns = inningDeliveries.reduce((sum, d) => sum + (d.runs || 0), 0);
+    const activeInningWickets = inningDeliveries.filter(d => d.is_wicket).length;
     const target = firstInningRuns + 1;
     
     const oversLimit = liveMatch.overs_limit || 5;
@@ -259,11 +262,12 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
       return liveMatch.special_extras ? true : (!isWide && !isNoBall);
     }).length;
 
+    const activeOversStr = `${Math.floor(activeLegalBalls / 6)}.${activeLegalBalls % 6}`;
     const ballsRemaining = Math.max(0, totalBallsLimit - activeLegalBalls);
-    const runsNeeded = Math.max(0, target - activeInning.total_runs);
+    const runsNeeded = Math.max(0, target - activeInningRuns);
 
     // CRR and RRR
-    const crr = activeLegalBalls > 0 ? ((activeInning.total_runs / activeLegalBalls) * 6).toFixed(2) : '0.00';
+    const crr = activeLegalBalls > 0 ? ((activeInningRuns / activeLegalBalls) * 6).toFixed(2) : '0.00';
     const rrr = ballsRemaining > 0 ? ((runsNeeded / ballsRemaining) * 6).toFixed(2) : '0.00';
 
     const t1 = getTeam(liveMatch.team1);
@@ -491,13 +495,13 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
               <span className="text-6xl sm:text-7xl font-black text-white tracking-tighter drop-shadow-md flex items-center overflow-hidden h-[60px] sm:h-[72px]">
                 <AnimatePresence mode="popLayout" initial={false}>
                   <motion.span
-                    key={activeInning.total_runs}
+                    key={activeInningRuns}
                     initial={{ y: -25, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: 25, opacity: 0 }}
                     transition={{ type: 'spring', stiffness: 350, damping: 20 }}
                   >
-                    {activeInning.total_runs}
+                    {activeInningRuns}
                   </motion.span>
                 </AnimatePresence>
               </span>
@@ -505,13 +509,13 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
               <span className="text-4xl sm:text-5xl font-black text-emerald-400 drop-shadow-md flex items-center overflow-hidden h-[40px] sm:h-[48px]">
                 <AnimatePresence mode="popLayout" initial={false}>
                   <motion.span
-                    key={activeInning.total_wickets}
+                    key={activeInningWickets}
                     initial={{ y: -20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: 20, opacity: 0 }}
                     transition={{ type: 'spring', stiffness: 350, damping: 20 }}
                   >
-                    {activeInning.total_wickets}
+                    {activeInningWickets}
                   </motion.span>
                 </AnimatePresence>
               </span>
@@ -519,13 +523,13 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
             <div className="text-base sm:text-lg font-bold text-slate-400 mt-0.5 flex items-center justify-center gap-1 overflow-hidden h-6">
               <AnimatePresence mode="popLayout" initial={false}>
                 <motion.span
-                  key={activeInning.total_overs}
+                  key={activeOversStr}
                   initial={{ y: -10, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   exit={{ y: 10, opacity: 0 }}
                   transition={{ duration: 0.2 }}
                 >
-                  {activeInning.total_overs.toFixed(1)}
+                  {activeOversStr}
                 </motion.span>
               </AnimatePresence>
               <span className="text-xs text-slate-500">Overs</span>
@@ -587,7 +591,7 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
                   Setting Target for <span className="text-emerald-400 font-black">{bowlingTeam?.short_name || 'Opponent'}</span>
                 </span>
                 <span className="text-[10px] text-slate-500 block">
-                  Projected Score: <span className="text-amber-400 font-black">{activeLegalBalls > 0 ? Math.round((activeInning.total_runs / activeLegalBalls) * totalBallsLimit) : 0}</span> runs (at current RR)
+                  Projected Score: <span className="text-amber-400 font-black">{activeLegalBalls > 0 ? Math.round((activeInningRuns / activeLegalBalls) * totalBallsLimit) : 0}</span> runs (at current RR)
                 </span>
               </div>
             )}
