@@ -116,15 +116,15 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
         return teams.find(t => t.id === secondInning.batting_team) || null;
       }
 
-      if (secondInningState.totalWickets >= maxWickets) {
-        return teams.find(t => t.id === secondInning.bawling_team) || null;
-      }
+      const isAllOut = secondInningState.totalWickets >= maxWickets;
+      const isOversOver = secondInningState.totalBalls >= maxBalls;
 
-      if (secondInningState.totalBalls >= maxBalls) {
+      if (isAllOut || isOversOver) {
+        if (secondInningState.totalRuns === target - 1) {
+          return null; // Tie: scores are level, no winner selected automatically
+        }
         if (secondInningState.totalRuns < target - 1) {
           return teams.find(t => t.id === secondInning.bawling_team) || null;
-        } else {
-          return teams.find(t => t.id === secondInning.batting_team) || null;
         }
       }
     }

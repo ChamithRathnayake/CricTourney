@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Trophy, Activity, GitBranch, BarChart3, Lock, ShieldAlert, Newspaper, Monitor, Sparkles } from 'lucide-react';
-import { getUserRole } from '../services/pocketbase';
+import { Trophy, Activity, GitBranch, BarChart3, Lock, ShieldAlert, Newspaper } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: string;
@@ -18,22 +17,26 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout
 }) => {
   const [logoError, setLogoError] = useState(false);
-  const role = getUserRole();
 
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: Activity },
     { id: 'bracket', label: 'Knockout', icon: GitBranch },
     { id: 'stats', label: 'Stats', icon: BarChart3 },
+<<<<<<< Updated upstream
     { id: 'fantasy', label: 'Fantasy League', icon: Sparkles },
     { id: 'news', label: 'News & Gallery', icon: Newspaper },
     ...(role === 'superuser' ? [{ id: 'display', label: 'Scoreboard', icon: Monitor }] : []),
     { id: 'admin', label: 'Admin Scorer', icon: Lock },
+=======
+    { id: 'news', label: 'News', icon: Newspaper },
+    { id: 'admin', label: 'Admin', icon: Lock },
+>>>>>>> Stashed changes
   ];
 
   return (
-    <header className={`${activeTab === 'admin' ? 'relative' : 'sticky top-0'} z-50 w-full glass-panel border-b border-slate-800/80 px-3 sm:px-4 py-2.5 sm:py-3 md:px-8`}>
+    <header className="sticky top-0 z-50 w-full glass-panel border-b border-slate-800/80 px-3 sm:px-4 py-2.5 sm:py-3 md:px-8">
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-        
+
         {/* Logo and Connection Indicator */}
         <div className="flex items-center gap-3">
           {!logoError ? (
@@ -75,11 +78,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-300 ${
-                  isActive
-                    ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 border border-emerald-500/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
-                }`}
+                className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-300 ${isActive
+                  ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 border border-emerald-500/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+                  }`}
               >
                 <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
                 <span className="hidden sm:inline">{tab.label}</span>
@@ -93,9 +95,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center gap-3 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800">
             <div className="flex items-center gap-1">
               <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-[10px] text-amber-400 font-semibold tracking-wider uppercase">
-                {role === 'superuser' ? 'Superuser Admin' : role === 'news' ? 'News Manager' : 'Live Scorer'}
-              </span>
+              <span className="text-[10px] text-amber-400 font-semibold tracking-wider uppercase">Admin</span>
             </div>
             <button
               onClick={onLogout}

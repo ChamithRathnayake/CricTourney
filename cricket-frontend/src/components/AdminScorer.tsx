@@ -176,6 +176,9 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
   // Custom overs states
   const [isCustomOvers, setIsCustomOvers] = useState(false);
   const [customOversVal, setCustomOversVal] = useState<string>('5');
+  const [showSOBattingFirstSelectModal, setShowSOBattingFirstSelectModal] = useState(false);
+  const [soSelectMatch, setSoSelectMatch] = useState<Match | null>(null);
+  const [soRoundNumToCreate, setSoRoundNumToCreate] = useState(1);
 
   // News management states
   const [news, setNews] = useState<News[]>([]);
@@ -340,6 +343,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
 
   const fetchMatchInnings = async (matchId: string, isInitialLoad = false) => {
     try {
+      const currentMatchObj = matches.find(m => m.id === matchId);
       // 1. Synchronously load squad from local storage first to prevent render race conditions
       const saved = localStorage.getItem(`squad_${matchId}`);
       let currentT1Squad: string[] = [];
@@ -385,22 +389,22 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
             if (d.striker) {
               const p = players.find(x => x.id === d.striker);
               if (p) {
-                if (p.team === selectedMatch?.team1) t1Set.add(p.id);
-                else if (p.team === selectedMatch?.team2) t2Set.add(p.id);
+                if (p.team === currentMatchObj?.team1) t1Set.add(p.id);
+                else if (p.team === currentMatchObj?.team2) t2Set.add(p.id);
               }
             }
             if (d.bawler) {
               const p = players.find(x => x.id === d.bawler);
               if (p) {
-                if (p.team === selectedMatch?.team1) t1Set.add(p.id);
-                else if (p.team === selectedMatch?.team2) t2Set.add(p.id);
+                if (p.team === currentMatchObj?.team1) t1Set.add(p.id);
+                else if (p.team === currentMatchObj?.team2) t2Set.add(p.id);
               }
             }
             if (d.out_player) {
               const p = players.find(x => x.id === d.out_player);
               if (p) {
-                if (p.team === selectedMatch?.team1) t1Set.add(p.id);
-                else if (p.team === selectedMatch?.team2) t2Set.add(p.id);
+                if (p.team === currentMatchObj?.team1) t1Set.add(p.id);
+                else if (p.team === currentMatchObj?.team2) t2Set.add(p.id);
               }
             }
           });
@@ -422,8 +426,8 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
         
         if (list.length > 2) {
           setOversLimit(1);
-        } else if (selectedMatch?.overs_limit) {
-          setOversLimit(selectedMatch.overs_limit);
+        } else if (currentMatchObj?.overs_limit) {
+          setOversLimit(currentMatchObj.overs_limit);
         }
 
         const activeDel = delList.filter(d => d.inning === activeInn.id);
@@ -1888,6 +1892,31 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
     }).length;
   };
 
+  const handleCreateSuperOverInning = async (battingTeamId: string, bowlingTeamId: string) => {
+    if (!soSelectMatch) return;
+    try {
+      await pb.collection('innings').create<Inning>({
+        match: soSelectMatch.id,
+        batting_team: battingTeamId,
+        bawling_team: bowlingTeamId,
+        total_runs: 0,
+        total_wickets: 0,
+        total_overs: 0
+      });
+
+      setStrikerId('');
+      setNonStrikerId('');
+      setBowlerId('');
+      setSuccessMsg(`Super Over ${soRoundNumToCreate} started!`);
+      setShowSOBattingFirstSelectModal(false);
+      setSoSelectMatch(null);
+      fetchMatchInnings(soSelectMatch.id, true);
+    } catch (err: any) {
+      setScorerErrorMsg(err.message || 'Error starting Super Over.');
+      setShowScorerErrorModal(true);
+    }
+  };
+
   const handleMatchSelect = (match: Match) => {
     setSelectedMatch(match);
     setErrorMsg('');
@@ -2734,30 +2763,9 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                   "Scores Tied! Play Super Over?",
                   `Both teams ended on ${secondInningRuns} runs. Would you like to play Super Over ${soNum}?`,
                   async () => {
-                    try {
-                      // Team batting second in previous pair bats first in Super Over
-                      const prevInning = innings[innings.length - 1];
-                      const nextBattingTeam = prevInning.batting_team;
-                      const nextBowlingTeam = prevInning.bawling_team;
-
-                      await pb.collection('innings').create<Inning>({
-                        match: selectedMatch.id,
-                        batting_team: nextBattingTeam,
-                        bawling_team: nextBowlingTeam,
-                        total_runs: 0,
-                        total_wickets: 0,
-                        total_overs: 0
-                      });
-
-                      setStrikerId('');
-                      setNonStrikerId('');
-                      setBowlerId('');
-                      setSuccessMsg(`Super Over ${soNum} started!`);
-                      fetchMatchInnings(selectedMatch.id, true);
-                    } catch (err: any) {
-                      setScorerErrorMsg(err.message || 'Error starting Super Over.');
-                      setShowScorerErrorModal(true);
-                    }
+                    setSoSelectMatch(selectedMatch);
+                    setSoRoundNumToCreate(soNum);
+                    setShowSOBattingFirstSelectModal(true);
                   },
                   {
                     confirmText: "Play Super Over",
@@ -6099,6 +6107,80 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
           </div>
         </div>
       )}
+
+      {/* SUPER OVER BATTING FIRST SELECTION MODAL */}
+      {showSOBattingFirstSelectModal && soSelectMatch && (() => {
+        const teamA = getTeam(soSelectMatch.team1);
+        const teamB = getTeam(soSelectMatch.team2);
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto overflow-x-hidden animate-fade-in">
+            <div className="w-full max-w-[calc(100vw-32px)] sm:max-w-md bg-slate-900 border border-slate-800 p-5 sm:p-6 rounded-2xl shadow-2xl space-y-6 relative overflow-hidden font-sans">
+              <div className="absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl pointer-events-none bg-emerald-500/10" />
+              
+              <div className="border-b border-slate-800 pb-3">
+                <h3 className="text-sm font-extrabold text-slate-100 uppercase tracking-widest">
+                  Super Over {soRoundNumToCreate} Setup
+                </h3>
+                <span className="text-[10px] text-slate-500 block mt-0.5">
+                  Select the team that will bat first in this Super Over
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                {teamA && (
+                  <button
+                    type="button"
+                    onClick={() => handleCreateSuperOverInning(teamA.id, teamB?.id || '')}
+                    className="w-full p-4 bg-slate-950/40 hover:bg-slate-950 border border-slate-800/80 hover:border-emerald-500/50 rounded-xl transition-all cursor-pointer text-left flex items-center gap-3 group"
+                  >
+                    {getTeamLogo(teamA) && (
+                      <img src={getTeamLogo(teamA)} alt="" className="w-8 h-8 rounded-lg object-contain bg-slate-900 p-1 border border-slate-800" />
+                    )}
+                    <div>
+                      <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Batting First</span>
+                      <span className="text-xs font-black text-slate-200 group-hover:text-emerald-400 transition-colors">
+                        {teamA.name}
+                      </span>
+                    </div>
+                  </button>
+                )}
+
+                {teamB && (
+                  <button
+                    type="button"
+                    onClick={() => handleCreateSuperOverInning(teamB.id, teamA?.id || '')}
+                    className="w-full p-4 bg-slate-950/40 hover:bg-slate-950 border border-slate-800/80 hover:border-emerald-500/50 rounded-xl transition-all cursor-pointer text-left flex items-center gap-3 group"
+                  >
+                    {getTeamLogo(teamB) && (
+                      <img src={getTeamLogo(teamB)} alt="" className="w-8 h-8 rounded-lg object-contain bg-slate-900 p-1 border border-slate-800" />
+                    )}
+                    <div>
+                      <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Batting First</span>
+                      <span className="text-xs font-black text-slate-200 group-hover:text-emerald-400 transition-colors">
+                        {teamB.name}
+                      </span>
+                    </div>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSOBattingFirstSelectModal(false);
+                    setSoSelectMatch(null);
+                  }}
+                  className="px-4 py-2 border border-slate-800 hover:border-slate-700 bg-slate-950/40 hover:bg-slate-950 text-slate-450 hover:text-slate-250 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* SCORER ERROR MODAL */}
       {showScorerErrorModal && (
