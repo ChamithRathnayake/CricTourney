@@ -22,15 +22,10 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'dashboard', label: 'Dashboard', icon: Activity },
     { id: 'bracket', label: 'Knockout', icon: GitBranch },
     { id: 'stats', label: 'Stats', icon: BarChart3 },
-<<<<<<< Updated upstream
     { id: 'fantasy', label: 'Fantasy League', icon: Sparkles },
     { id: 'news', label: 'News & Gallery', icon: Newspaper },
     ...(role === 'superuser' ? [{ id: 'display', label: 'Scoreboard', icon: Monitor }] : []),
     { id: 'admin', label: 'Admin Scorer', icon: Lock },
-=======
-    { id: 'news', label: 'News', icon: Newspaper },
-    { id: 'admin', label: 'Admin', icon: Lock },
->>>>>>> Stashed changes
   ];
 
   return (
