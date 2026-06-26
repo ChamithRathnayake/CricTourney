@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Trophy, Activity, GitBranch, BarChart3, Lock, ShieldAlert, Newspaper } from 'lucide-react';
+import { Trophy, Activity, GitBranch, BarChart3, Lock, ShieldAlert, Newspaper, Monitor, Sparkles } from 'lucide-react';
+import { getUserRole } from '../services/pocketbase';
 
 interface NavbarProps {
   activeTab: string;
@@ -17,24 +18,20 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout
 }) => {
   const [logoError, setLogoError] = useState(false);
+  const role = getUserRole();
 
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: Activity },
     { id: 'bracket', label: 'Knockout', icon: GitBranch },
     { id: 'stats', label: 'Stats', icon: BarChart3 },
-<<<<<<< Updated upstream
     { id: 'fantasy', label: 'Fantasy League', icon: Sparkles },
-    { id: 'news', label: 'News & Gallery', icon: Newspaper },
-    ...(role === 'superuser' ? [{ id: 'display', label: 'Scoreboard', icon: Monitor }] : []),
-    { id: 'admin', label: 'Admin Scorer', icon: Lock },
-=======
     { id: 'news', label: 'News', icon: Newspaper },
+    ...(isAdmin && role === 'superuser' ? [{ id: 'display', label: 'Scoreboard', icon: Monitor }] : []),
     { id: 'admin', label: 'Admin', icon: Lock },
->>>>>>> Stashed changes
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full glass-panel border-b border-slate-800/80 px-3 sm:px-4 py-2.5 sm:py-3 md:px-8">
+    <header className={`${activeTab === 'admin' ? 'relative' : 'sticky top-0'} z-50 w-full glass-panel border-b border-slate-800/80 px-3 sm:px-4 py-2.5 sm:py-3 md:px-8`}>
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
 
         {/* Logo and Connection Indicator */}
@@ -95,7 +92,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center gap-3 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800">
             <div className="flex items-center gap-1">
               <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-[10px] text-amber-400 font-semibold tracking-wider uppercase">Admin</span>
+              <span className="text-[10px] text-amber-400 font-semibold tracking-wider uppercase">
+                {role === 'superuser' ? 'Superadmin' : role === 'news' ? 'News Editor' : 'Scorer'}
+              </span>
             </div>
             <button
               onClick={onLogout}
