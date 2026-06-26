@@ -5610,8 +5610,8 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
 
       {/* WICKET MODAL */}
       {showWicketModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto overflow-x-hidden">
+          <div className="w-full max-w-[calc(100vw-32px)] sm:max-w-md bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-2xl shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
             
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-sm font-extrabold text-rose-400 uppercase tracking-widest">Select Wicket Details</h3>
@@ -5748,8 +5748,8 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
 
       {/* EDIT TEAM MODAL */}
       {editingTeam && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto overflow-x-hidden">
+          <div className="w-full max-w-[calc(100vw-32px)] sm:max-w-md bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-2xl shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-sm font-extrabold text-slate-200 uppercase tracking-widest">Edit Team Details</h3>
               <button onClick={() => setEditingTeam(null)} className="text-slate-500 hover:text-slate-300 cursor-pointer">
@@ -5818,8 +5818,8 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
 
       {/* EDIT PLAYER MODAL */}
       {editingPlayer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto overflow-x-hidden">
+          <div className="w-full max-w-[calc(100vw-32px)] sm:max-w-md bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-2xl shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-sm font-extrabold text-slate-200 uppercase tracking-widest">Edit Player Details</h3>
               <button onClick={() => setEditingPlayer(null)} className="text-slate-500 hover:text-slate-300 cursor-pointer">
@@ -5904,8 +5904,8 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
 
       {/* EDIT NEWS MODAL */}
       {editingNews && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto relative overflow-hidden font-sans">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto overflow-x-hidden">
+          <div className="w-full max-w-[calc(100vw-32px)] sm:max-w-lg bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-2xl shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto relative overflow-hidden font-sans">
             {/* Subtle premium background glow */}
             <div className="absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl pointer-events-none bg-emerald-500/5" />
             
@@ -6047,8 +6047,8 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
 
       {/* CUSTOM CONFIRMATION MODAL */}
       {showConfirmModal && confirmModalConfig && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 relative overflow-hidden font-sans max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto overflow-x-hidden">
+          <div className="w-full max-w-[calc(100vw-32px)] sm:max-w-md bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-2xl shadow-2xl space-y-5 relative overflow-hidden font-sans max-h-[90vh] overflow-y-auto">
             {/* Ambient subtle glow inside modal for wow-factor */}
             <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl pointer-events-none ${confirmModalConfig.isDanger ? 'bg-rose-500/10' : 'bg-emerald-500/10'}`} />
             
@@ -6102,8 +6102,8 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
 
       {/* SCORER ERROR MODAL */}
       {showScorerErrorModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 relative overflow-hidden font-sans max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto overflow-x-hidden">
+          <div className="w-full max-w-[calc(100vw-32px)] sm:max-w-md bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-2xl shadow-2xl space-y-5 relative overflow-hidden font-sans max-h-[90vh] overflow-y-auto">
             {/* Ambient red glow inside modal for error warning */}
             <div className="absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl pointer-events-none bg-rose-500/10" />
             
