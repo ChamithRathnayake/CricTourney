@@ -100,21 +100,23 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
       return teams.find(t => t.id === match.winner) || null;
     }
 
-    if (match.status === 'Live' && matchInnings.length === 2) {
-      const firstInning = matchInnings[0];
-      const secondInning = matchInnings[1];
+    if (match.status === 'Live' && matchInnings.length >= 2 && matchInnings.length % 2 === 0) {
+      const isSuperOver = matchInnings.length > 2;
+      const firstInning = matchInnings[matchInnings.length - 2];
+      const secondInning = matchInnings[matchInnings.length - 1];
       const firstInningState = getInningState(firstInning, deliveriesList);
       const secondInningState = getInningState(secondInning, deliveriesList);
 
       const target = firstInningState.totalRuns + 1;
-      const oversLimit = match.overs_limit || 5;
+      const oversLimit = isSuperOver ? 1 : (match.overs_limit || 5);
+      const maxWickets = isSuperOver ? 2 : 10;
       const maxBalls = oversLimit * 6;
 
       if (secondInningState.totalRuns >= target) {
         return teams.find(t => t.id === secondInning.batting_team) || null;
       }
 
-      if (secondInningState.totalWickets >= 10) {
+      if (secondInningState.totalWickets >= maxWickets) {
         return teams.find(t => t.id === secondInning.bawling_team) || null;
       }
 
@@ -1260,20 +1262,21 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
             )}
           </div>
         </div>
-        {match.status === 'Live' && matchInnings.length === 2 && (() => {
-          const firstInningState = getInningState(matchInnings[0], allDeliveries);
-          const secondInningState = getInningState(matchInnings[1], allDeliveries);
+        {match.status === 'Live' && matchInnings.length >= 2 && matchInnings.length % 2 === 0 && (() => {
+          const isSO = matchInnings.length > 2;
+          const firstInningState = getInningState(matchInnings[matchInnings.length - 2], allDeliveries);
+          const secondInningState = getInningState(matchInnings[matchInnings.length - 1], allDeliveries);
           const target = firstInningState.totalRuns + 1;
           const runsNeeded = target - secondInningState.totalRuns;
           if (runsNeeded <= 0) return null; // Hide if target is chased!
-          const oversLimit = match.overs_limit || 5;
-          const maxBalls = oversLimit * 6;
+          const oversLimitVal = isSO ? 1 : (match.overs_limit || 5);
+          const maxBalls = oversLimitVal * 6;
           const ballsRemaining = Math.max(0, maxBalls - secondInningState.totalBalls);
           const oversRemainingStr = `${Math.floor(ballsRemaining / 6)}.${ballsRemaining % 6}`;
 
           return (
             <div className="mt-1 text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/20 flex flex-wrap items-center justify-between gap-2">
-              <span>🎯 Target: <span className="font-extrabold text-white">{target}</span></span>
+              <span>🎯 {isSO ? 'SO ' : ''}Target: <span className="font-extrabold text-white">{target}</span></span>
               <span>Need {runsNeeded} runs from {ballsRemaining} balls ({oversRemainingStr} ov)</span>
             </div>
           );
@@ -1291,15 +1294,27 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
   const battingTeam = activeInning ? getTeam(activeInning.batting_team) : null;
   const isTeam1Batting = liveMatch && activeInning && activeInning.batting_team === liveMatch.team1;
   const isTeam2Batting = liveMatch && activeInning && activeInning.batting_team === liveMatch.team2;
+  
   const t1Inning = liveMatch ? liveInnings.find(i => i.batting_team === liveMatch.team1) : null;
   const t1InningState = t1Inning ? getInningState(t1Inning, liveDeliveries) : null;
   const t2Inning = liveMatch ? liveInnings.find(i => i.batting_team === liveMatch.team2) : null;
   const t2InningState = t2Inning ? getInningState(t2Inning, liveDeliveries) : null;
+
+  const isSuperOver = liveInnings.length > 2;
+  const t1SuperInnings = liveMatch ? liveInnings.slice(2).filter(i => i.batting_team === liveMatch.team1) : [];
+  const t2SuperInnings = liveMatch ? liveInnings.slice(2).filter(i => i.batting_team === liveMatch.team2) : [];
+  const t1SuperInning = t1SuperInnings[t1SuperInnings.length - 1];
+  const t2SuperInning = t2SuperInnings[t2SuperInnings.length - 1];
+  const t1SuperInningState = t1SuperInning ? getInningState(t1SuperInning, liveDeliveries) : null;
+  const t2SuperInningState = t2SuperInning ? getInningState(t2SuperInning, liveDeliveries) : null;
+
   const dynamicWinner = liveMatch ? getMatchWinner(liveMatch, liveInnings, liveDeliveries) : null;
   const secondInning = liveInnings[1];
-  const isSecondInning = !!secondInning;
+  const isSecondInning = liveInnings.length % 2 === 0;
   const secondInningState = secondInning ? getInningState(secondInning, liveDeliveries) : null;
-  const isVotingLocked = isSecondInning && secondInningState && secondInningState.totalBalls >= (liveMatch?.overs_limit || 5) * 3;
+  
+  const oversLimit = isSuperOver ? 1 : (liveMatch?.overs_limit || 5);
+  const isVotingLocked = isSuperOver || (isSecondInning && secondInningState && secondInningState.totalBalls >= (liveMatch?.overs_limit || 5) * 3);
 
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 space-y-12">
@@ -1496,6 +1511,11 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
               <span className="w-2 h-2 rounded-full bg-rose-500 pulse-fast" />
               LIVE MATCH
             </span>
+            {isSuperOver && (
+              <span className="flex items-center gap-1.5 text-xs font-black text-amber-350 bg-amber-500/15 px-3 py-1 rounded-full border border-amber-500/30 animate-pulse shrink-0">
+                💥 SUPER OVER
+              </span>
+            )}
             <span className="text-xs text-slate-400 font-semibold tracking-wider uppercase">
               {liveMatch.stage}
             </span>
@@ -1647,6 +1667,11 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
                       Score: {t1InningState.totalRuns}/{t1InningState.totalWickets} ({t1InningState.oversStr}/{liveMatch.overs_limit || 5} ov)
                     </div>
                   )}
+                  {t1SuperInningState && (
+                    <div className="text-[10px] mt-1 font-extrabold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-lg inline-block">
+                      Super Over: {t1SuperInningState.totalRuns}/{t1SuperInningState.totalWickets} ({t1SuperInningState.oversStr}/1 ov)
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1694,7 +1719,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
                           {activeInningState.oversStr}
                         </motion.span>
                       </AnimatePresence>
-                      <span>/ {liveMatch.overs_limit || 5}</span>
+                      <span>/ {oversLimit}</span>
                     </div>
                     {dynamicWinner ? (
                       <span className="inline-block text-[10px] text-amber-400 font-black uppercase tracking-wider mt-1.5 bg-amber-500/10 px-2.5 py-0.5 rounded border border-amber-500/20 animate-bounce">
@@ -1730,6 +1755,11 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
                       Score: {t2InningState.totalRuns}/{t2InningState.totalWickets} ({t2InningState.oversStr}/{liveMatch.overs_limit || 5} ov)
                     </div>
                   )}
+                  {t2SuperInningState && (
+                    <div className="text-[10px] mt-1 font-extrabold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-lg inline-block">
+                      Super Over: {t2SuperInningState.totalRuns}/{t2SuperInningState.totalWickets} ({t2SuperInningState.oversStr}/1 ov)
+                    </div>
+                  )}
                 </div>
                 {getTeam(liveMatch.team2) && getTeamLogo(getTeam(liveMatch.team2)) ? (
                   <img
@@ -1752,22 +1782,24 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
             </div>
 
             {/* Chasing Status Banner */}
-            {liveInnings.length === 2 && (() => {
-              const firstInningState = getInningState(liveInnings[0], liveDeliveries);
-              const secondInningState = getInningState(liveInnings[1], liveDeliveries);
+            {isSecondInning && (() => {
+              const firstInningState = getInningState(liveInnings[liveInnings.length - 2], liveDeliveries);
+              const secondInningState = getInningState(liveInnings[liveInnings.length - 1], liveDeliveries);
               const target = firstInningState.totalRuns + 1;
               const runsNeeded = target - secondInningState.totalRuns;
               if (runsNeeded <= 0) return null; // Hide if target is chased!
-              const oversLimit = liveMatch.overs_limit || 5;
-              const maxBalls = oversLimit * 6;
+              const targetOversLimit = isSuperOver ? 1 : (liveMatch.overs_limit || 5);
+              const maxBalls = targetOversLimit * 6;
               const ballsRemaining = Math.max(0, maxBalls - secondInningState.totalBalls);
               const oversRemainingStr = `${Math.floor(ballsRemaining / 6)}.${ballsRemaining % 6}`;
-              const chasingTeam = getTeam(liveInnings[1].batting_team);
+              const chasingTeam = getTeam(liveInnings[liveInnings.length - 1].batting_team);
 
               return (
                 <div className="mt-4 px-4 py-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-center text-xs font-semibold text-emerald-300 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 shadow-sm shadow-emerald-500/5">
                   <div className="flex items-center gap-1">
-                    <span className="text-[10px] bg-emerald-500 text-slate-950 px-2 py-0.5 rounded font-black uppercase tracking-wider">Target</span>
+                    <span className="text-[10px] bg-emerald-500 text-slate-950 px-2 py-0.5 rounded font-black uppercase tracking-wider">
+                      {isSuperOver ? 'SO Target' : 'Target'}
+                    </span>
                     <span className="font-extrabold text-white text-sm">{target}</span>
                   </div>
                   <div className="h-3 w-px bg-slate-800 hidden sm:block" />
@@ -2095,7 +2127,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
       {/* ----------------- 3. DETAILED SCORECARD MODAL ----------------- */}
       {selectedPopupMatch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto overflow-x-hidden">
-          <div className="w-full max-w-3xl max-w-full min-w-0 bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl relative flex flex-col max-h-[95svh] sm:max-h-[90svh] overflow-hidden my-auto sm:my-8">
+          <div className="w-full max-w-full sm:max-w-3xl min-w-0 bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl relative flex flex-col max-h-[95svh] sm:max-h-[90svh] overflow-hidden my-auto sm:my-8">
 
             {/* Modal Header */}
             <div className="p-4 sm:p-5 border-b border-slate-800/60 flex items-center justify-between shrink-0 gap-4">
@@ -2212,7 +2244,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
                               <img src={getTeamLogo(bTeam)} alt="" className="w-4 h-4 rounded-md object-cover border border-slate-800" />
                             )}
                             <span>
-                              {bTeam?.short_name} {state.totalRuns}/{state.totalWickets} <span className="text-[9px] font-normal lowercase">({state.oversStr}/{selectedPopupMatch?.overs_limit || 5} ov)</span>
+                              {index >= 2 ? `SO ${Math.floor((index - 2) / 2) + 1}: ` : ''}{bTeam?.short_name} {state.totalRuns}/{state.totalWickets} <span className="text-[9px] font-normal lowercase">({state.oversStr}/{index >= 2 ? 1 : (selectedPopupMatch?.overs_limit || 5)} ov)</span>
                             </span>
                           </button>
                         );
@@ -2281,7 +2313,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
                           <div>
                             <h4 className={`text-xs font-black uppercase tracking-wider border-b border-slate-800 pb-2 mb-3 transition-colors ${isCurrentlyBatting ? 'text-emerald-400 font-extrabold text-sm' : 'text-slate-400'
                               }`}>
-                              {isCurrentlyBatting && '🏏 '}{bTeam?.name} Innings Batting
+                              {isCurrentlyBatting && '🏏 '}{bTeam?.name} {popupInningTab >= 2 ? 'Super Over ' : ''}Innings Batting
                             </h4>
 
                             <div className="overflow-x-auto w-full">
@@ -2660,7 +2692,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto overflow-x-hidden">
-            <div className="w-full max-w-3xl max-w-full min-w-0 bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl relative flex flex-col max-h-[95svh] sm:max-h-[90svh] overflow-hidden my-auto sm:my-8">
+            <div className="w-full max-w-full sm:max-w-3xl min-w-0 bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl relative flex flex-col max-h-[95svh] sm:max-h-[90svh] overflow-hidden my-auto sm:my-8">
               
               {/* Modal Header */}
               <div className="p-4 sm:p-5 border-b border-slate-800/60 flex items-center justify-between shrink-0 gap-4">

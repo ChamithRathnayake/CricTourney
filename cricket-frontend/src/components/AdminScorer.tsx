@@ -256,6 +256,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
     title: string;
     message: string;
     onConfirm: () => void | Promise<void>;
+    onCancel?: () => void | Promise<void>;
     confirmText?: string;
     cancelText?: string;
     isDanger?: boolean;
@@ -265,12 +266,13 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
     title: string,
     message: string,
     onConfirm: () => void | Promise<void>,
-    options?: { confirmText?: string; cancelText?: string; isDanger?: boolean }
+    options?: { confirmText?: string; cancelText?: string; isDanger?: boolean; onCancel?: () => void | Promise<void> }
   ) => {
     setConfirmModalConfig({
       title,
       message,
       onConfirm,
+      onCancel: options?.onCancel,
       confirmText: options?.confirmText || 'Confirm',
       cancelText: options?.cancelText || 'Cancel',
       isDanger: options?.isDanger || false
@@ -418,7 +420,9 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
         const activeInn = list[list.length - 1];
         setBattingFirst(activeInn.batting_team); // Ensure battingFirst is set when resuming!
         
-        if (selectedMatch?.overs_limit) {
+        if (list.length > 2) {
+          setOversLimit(1);
+        } else if (selectedMatch?.overs_limit) {
           setOversLimit(selectedMatch.overs_limit);
         }
 
@@ -1063,6 +1067,26 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
             : `${inn.total_runs}/${inn.total_wickets} (${inn.total_overs} ov)`;
         };
 
+        const getSuperOverDetails = () => {
+          if (mInnings.length <= 2) return '-';
+          const superInnings = mInnings.slice(2);
+          const details: string[] = [];
+          for (let i = 0; i < superInnings.length; i += 2) {
+            const inn1 = superInnings[i];
+            const inn2 = superInnings[i + 1];
+            const t1Name = teams.find(t => t.id === inn1.batting_team)?.short_name || 'Unknown';
+            const score1 = `${t1Name}: ${inn1.total_runs}/${inn1.total_wickets} (${inn1.total_overs} ov)`;
+            
+            let score2 = 'DNB';
+            if (inn2) {
+              const t2Name = teams.find(t => t.id === inn2.batting_team)?.short_name || 'Unknown';
+              score2 = `${t2Name}: ${inn2.total_runs}/${inn2.total_wickets} (${inn2.total_overs} ov)`;
+            }
+            details.push(`SO ${Math.floor(i / 2) + 1} (${score1} vs ${score2})`);
+          }
+          return details.join(' | ');
+        };
+
         const matchDate = m.match_time ? new Date(m.match_time).toLocaleString() : '-';
 
         return {
@@ -1073,6 +1097,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
           'Status': m.status,
           'Innings 1 Score': getInningScore(mInnings[0]),
           'Innings 2 Score': getInningScore(mInnings[1]),
+          'Super Over Score(s)': getSuperOverDetails(),
           'Winner': winner ? winner.name : (m.status === 'Completed' ? 'Tie/No Result' : '-')
         };
       });
@@ -1680,7 +1705,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
             return `
               <div class="inning-section">
                 <div class="inning-header">
-                  <h3>Inning ${idx + 1}: ${team?.name || 'Unknown'}</h3>
+                  <h3>${idx >= 2 ? `Super Over ${Math.floor((idx - 2) / 2) + 1} - Inning ${idx % 2 === 0 ? 1 : 2}` : `Inning ${idx + 1}`}: ${team?.name || 'Unknown'}</h3>
                   <div class="score">${state.totalRuns}/${state.totalWickets} <span style="font-size: 13px; font-weight: 500; color: #64748b;">(${state.oversStr} Overs)</span></div>
                 </div>
 
@@ -1838,17 +1863,21 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
   const totalRuns = inningDeliveries.reduce((sum, d) => sum + (d.runs || 0), 0);
   const totalWickets = inningDeliveries.filter(d => d.is_wicket).length;
 
+  const maxWickets = innings.length > 2 ? 2 : 10;
+
   const isTargetChased = (() => {
-    if (selectedMatch && innings.length === 2 && activeInning && activeInning.id === innings[1].id) {
-      const firstInningDeliveries = deliveries.filter(d => d.inning === innings[0].id);
-      const firstInningRuns = firstInningDeliveries.reduce((sum, d) => sum + (d.runs || 0), 0);
-      return totalRuns > firstInningRuns;
+    if (selectedMatch && innings.length >= 2 && innings.length % 2 === 0 && activeInning && activeInning.id === innings[innings.length - 1].id) {
+      const prevInningIdx = innings.length - 2;
+      const prevInningDeliveries = deliveries.filter(d => d.inning === innings[prevInningIdx].id);
+      const prevInningRuns = prevInningDeliveries.reduce((sum, d) => sum + (d.runs || 0), 0);
+      return totalRuns > prevInningRuns;
     }
     return false;
   })();
 
   const isOversLimitMet = legalBallsCount >= oversLimit * 6;
-  const isScoringLocked = isTargetChased || isOversLimitMet;
+  const isAllOut = totalWickets >= maxWickets;
+  const isScoringLocked = isTargetChased || isOversLimitMet || isAllOut;
   
   // Bowler delivery count mapping
   const getBowlerBalls = (playerId: string) => {
@@ -2638,17 +2667,18 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
   const handleDeclareInning = () => {
     if (!selectedMatch || !activeInning) return;
     
-    const confirmMsg = innings.length === 1
-      ? "Are you sure you want to end the 1st Inning and switch to the 2nd Inning?"
-      : "Are you sure you want to declare the inning and end the match?";
+    const isSuperOver = innings.length > 2;
+    const confirmMsg = innings.length % 2 === 1
+      ? `Are you sure you want to end ${isSuperOver ? 'Super Over ' : ''}Inning ${innings.length} and switch to Inning ${innings.length + 1}?`
+      : `Are you sure you want to declare and end the match?`;
 
     triggerConfirm(
-      innings.length === 1 ? "End First Inning" : "Declare & End Match",
+      innings.length % 2 === 1 ? "End Inning" : "Declare & End Match",
       confirmMsg,
       async () => {
         try {
-          if (innings.length === 1) {
-            // Start Inning 2
+          if (innings.length % 2 === 1) {
+            // Start the next inning of this pair (e.g. Inning 2, 4, etc.)
             const nextBattingTeam = activeInning.bawling_team;
             const nextBowlingTeam = activeInning.batting_team;
 
@@ -2664,42 +2694,102 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
             setStrikerId('');
             setNonStrikerId('');
             setBowlerId('');
-            setSuccessMsg('First inning complete. Setup the second inning!');
+            setSuccessMsg(innings.length === 1 ? 'First inning complete. Setup the second inning!' : 'Super Over Inning 1 complete. Setup the chase!');
+            fetchMatchInnings(selectedMatch.id, true);
           } else {
-            // Both innings done - complete match
-            const firstInningDeliveries = deliveries.filter(d => d.inning === innings[0].id);
-            const secondInningDeliveries = deliveries.filter(d => d.inning === innings[1].id);
+            // Both innings of the current pair are done - check results
+            const idxFirst = innings.length - 2;
+            const idxSecond = innings.length - 1;
+            const firstInningDeliveries = deliveries.filter(d => d.inning === innings[idxFirst].id);
+            const secondInningDeliveries = deliveries.filter(d => d.inning === innings[idxSecond].id);
             const firstInningRuns = firstInningDeliveries.reduce((sum, d) => sum + (d.runs || 0), 0);
             const secondInningRuns = secondInningDeliveries.reduce((sum, d) => sum + (d.runs || 0), 0);
 
-            let matchWinner = '';
-            if (firstInningRuns > secondInningRuns) {
-              matchWinner = innings[0].batting_team;
-            } else if (secondInningRuns > firstInningRuns) {
-              matchWinner = innings[1].batting_team;
+            if (firstInningRuns !== secondInningRuns) {
+              // Decisive score
+              let matchWinner = '';
+              if (firstInningRuns > secondInningRuns) {
+                matchWinner = innings[idxFirst].batting_team;
+              } else {
+                matchWinner = innings[idxSecond].batting_team;
+              }
+
+              await pb.collection('matches').update(selectedMatch.id, {
+                status: 'Completed',
+                winner: matchWinner
+              });
+
+              await promoteWinnerInBracket(selectedMatch, matchWinner);
+
+              setSelectedMatch(null);
+              setSuccessMsg('Match completed successfully!');
+              refreshData();
             } else {
-              matchWinner = innings[1].batting_team;
+              // Scores are level! Ask admin to start a Super Over
+              const soNum = Math.floor((innings.length - 2) / 2) + 1;
+              
+              // We need to trigger this confirm box shortly after the current confirm closes
+              setTimeout(() => {
+                triggerConfirm(
+                  "Scores Tied! Play Super Over?",
+                  `Both teams ended on ${secondInningRuns} runs. Would you like to play Super Over ${soNum}?`,
+                  async () => {
+                    try {
+                      // Team batting second in previous pair bats first in Super Over
+                      const prevInning = innings[innings.length - 1];
+                      const nextBattingTeam = prevInning.batting_team;
+                      const nextBowlingTeam = prevInning.bawling_team;
+
+                      await pb.collection('innings').create<Inning>({
+                        match: selectedMatch.id,
+                        batting_team: nextBattingTeam,
+                        bawling_team: nextBowlingTeam,
+                        total_runs: 0,
+                        total_wickets: 0,
+                        total_overs: 0
+                      });
+
+                      setStrikerId('');
+                      setNonStrikerId('');
+                      setBowlerId('');
+                      setSuccessMsg(`Super Over ${soNum} started!`);
+                      fetchMatchInnings(selectedMatch.id, true);
+                    } catch (err: any) {
+                      setScorerErrorMsg(err.message || 'Error starting Super Over.');
+                      setShowScorerErrorModal(true);
+                    }
+                  },
+                  {
+                    confirmText: "Play Super Over",
+                    cancelText: "Declare Tie / Draw",
+                    isDanger: false,
+                    onCancel: async () => {
+                      try {
+                        await pb.collection('matches').update(selectedMatch.id, {
+                          status: 'Completed',
+                          winner: '' // Tie (no winner)
+                        });
+
+                        setSelectedMatch(null);
+                        setSuccessMsg('Match declared as a Tie/Draw.');
+                        refreshData();
+                      } catch (err: any) {
+                        setScorerErrorMsg(err.message || 'Error completing match.');
+                        setShowScorerErrorModal(true);
+                      }
+                    }
+                  }
+                );
+              }, 300);
             }
-
-            await pb.collection('matches').update(selectedMatch.id, {
-              status: 'Completed',
-              winner: matchWinner
-            });
-
-            await promoteWinnerInBracket(selectedMatch, matchWinner);
-
-            setSelectedMatch(null);
-            setSuccessMsg('Match completed successfully!');
-            refreshData();
           }
-          fetchMatchInnings(selectedMatch.id, true);
         } catch (err: any) {
           setScorerErrorMsg(err.message || 'Error declaring inning.');
           setShowScorerErrorModal(true);
         }
       },
       {
-        confirmText: innings.length === 1 ? "End Inning" : "Declare & End Match",
+        confirmText: innings.length % 2 === 1 ? "End Inning" : "Declare & End Match",
         isDanger: true
       }
     );
@@ -5022,7 +5112,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
               <div className="glass-panel p-6 rounded-2xl border border-slate-800/80 space-y-6">
                 {/* Recent Balls Ticker (Phase 2 Upgrade!) */}
                 {activeInning && inningDeliveries.length > 0 && (() => {
-                  let isComplete = selectedMatch.status === 'Completed' || totalWickets >= 10 || legalBallsCount >= oversLimit * 6;
+                  let isComplete = selectedMatch.status === 'Completed' || totalWickets >= maxWickets || legalBallsCount >= oversLimit * 6;
                   if (innings.length === 2 && activeInning.id === innings[1].id) {
                     const firstInningDeliveries = deliveries.filter(d => d.inning === innings[0].id);
                     const firstInningRuns = firstInningDeliveries.reduce((sum, d) => sum + (d.runs || 0), 0);
@@ -5077,6 +5167,20 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                     <button 
                       onClick={undoLastBall}
                       className="w-full sm:w-auto px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg font-black uppercase text-[10px] transition-colors cursor-pointer text-center"
+                    >
+                      Undo Last Ball
+                    </button>
+                  </div>
+                )}
+
+                {!isTargetChased && !isOversLimitMet && isAllOut && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 text-rose-350 px-4 py-3 rounded-xl text-xs font-bold flex flex-col sm:flex-row items-center justify-between gap-3 animate-pulse mb-6">
+                    <span className="flex items-center gap-1.5">
+                      ⚠️ All Out! Inning is complete. Please declare or switch innings. To edit, click Undo.
+                    </span>
+                    <button 
+                      onClick={undoLastBall}
+                      className="w-full sm:w-auto px-3 py-1.5 bg-rose-500 hover:bg-rose-450 text-white rounded-lg font-black uppercase text-[10px] transition-colors cursor-pointer text-center"
                     >
                       Undo Last Ball
                     </button>
@@ -5967,7 +6071,12 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
             <div className="flex gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => setShowConfirmModal(false)}
+                onClick={async () => {
+                  setShowConfirmModal(false);
+                  if (confirmModalConfig.onCancel) {
+                    await confirmModalConfig.onCancel();
+                  }
+                }}
                 className="flex-1 py-2.5 bg-slate-950/60 hover:bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold rounded-xl transition-all cursor-pointer"
               >
                 {confirmModalConfig.cancelText || 'Cancel'}

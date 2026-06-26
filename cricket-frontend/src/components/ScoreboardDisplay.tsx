@@ -126,12 +126,9 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
     if (!liveMatch) return null;
 
     const matchInnings = allInnings.filter(i => i.match === liveMatch.id);
-    const inning1 = matchInnings[0];
-    const inning2 = matchInnings[1];
     
-    // The active inning is the second inning if it exists, otherwise the first inning
-    const activeInning = inning2 || inning1;
-    const isSecondInning = !!inning2;
+    const activeInning = matchInnings[matchInnings.length - 1];
+    const isSecondInning = matchInnings.length % 2 === 0;
 
     if (!activeInning) {
       return (
@@ -246,15 +243,24 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
     const bowler = currentBowlerId ? getPlayer(currentBowlerId) : null;
 
     // Calculate target and balls remaining
-    const inning1Deliveries = inning1 ? allDeliveries.filter(d => d.inning === inning1.id) : [];
-    const firstInningRuns = inning1Deliveries.reduce((sum, d) => sum + (d.runs || 0), 0);
+    const isSuperOver = matchInnings.length > 2;
+    const oversLimit = isSuperOver ? 1 : (liveMatch.overs_limit || 5);
+    const totalBallsLimit = oversLimit * 6;
+
     const activeInningRuns = inningDeliveries.reduce((sum, d) => sum + (d.runs || 0), 0);
     const activeInningWickets = inningDeliveries.filter(d => d.is_wicket).length;
-    const target = firstInningRuns + 1;
-    
-    const oversLimit = liveMatch.overs_limit || 5;
-    const totalBallsLimit = oversLimit * 6;
-    
+
+    let target = 0;
+    let firstInningRuns = 0;
+    if (isSecondInning) {
+      const firstInningOfPair = matchInnings[matchInnings.length - 2];
+      const firstInningOfPairDeliveries = firstInningOfPair 
+        ? allDeliveries.filter(d => d.inning === firstInningOfPair.id)
+        : [];
+      firstInningRuns = firstInningOfPairDeliveries.reduce((sum, d) => sum + (d.runs || 0), 0);
+      target = firstInningRuns + 1;
+    }
+
     // Active Inning legal balls count
     const activeLegalBalls = inningDeliveries.filter(d => {
       const isWide = d.extra_type === 'Wide';
@@ -456,7 +462,9 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
                 />
                 <div>
                   <span className="text-[8px] bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider">
-                    Batting Inning {isSecondInning ? '02' : '01'}
+                    {isSuperOver 
+                      ? `Super Over ${Math.floor((matchInnings.length - 1) / 2) + 1} - Inn ${matchInnings.length % 2 === 1 ? '01' : '02'}`
+                      : `Batting Inning ${isSecondInning ? '02' : '01'}`}
                   </span>
                   <h2 className="text-lg sm:text-xl font-extrabold text-slate-100 tracking-tight mt-0.5">{battingTeam?.name}</h2>
                 </div>
@@ -571,7 +579,7 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
               <>
                 <div className="space-y-0.5 text-center sm:text-left">
                   <span className="text-xs text-slate-400 block font-extrabold uppercase tracking-wider">
-                    Target: <span className="text-amber-400 font-black text-sm sm:text-base">{target} Runs</span>
+                    {isSuperOver ? 'SO Target:' : 'Target:'} <span className="text-amber-400 font-black text-sm sm:text-base">{target} Runs</span>
                   </span>
                   <span className="text-xs sm:text-sm text-slate-200 block font-bold">
                     Opponent <span className="text-emerald-400 font-black">{bowlingTeam?.short_name || 'Opponent'}</span> scored <span className="text-amber-400 font-black text-sm sm:text-base">{firstInningRuns} runs</span>
@@ -586,7 +594,11 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
               </>
             ) : (
               <div className="w-full text-center sm:text-left space-y-0.5">
-                <span className="text-xs text-slate-400 block font-extrabold uppercase tracking-wider">First Inning</span>
+                <span className="text-xs text-slate-400 block font-extrabold uppercase tracking-wider">
+                  {isSuperOver 
+                    ? `Super Over ${Math.floor((matchInnings.length - 1) / 2) + 1} - Inn 01` 
+                    : 'First Inning'}
+                </span>
                 <span className="text-xs sm:text-sm text-slate-200 block font-bold">
                   Setting Target for <span className="text-emerald-400 font-black">{bowlingTeam?.short_name || 'Opponent'}</span>
                 </span>
