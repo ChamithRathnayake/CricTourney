@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Trophy, Activity, GitBranch, BarChart3, Lock, ShieldAlert, Newspaper } from 'lucide-react';
+import { Trophy, Activity, GitBranch, BarChart3, Lock, ShieldAlert, Newspaper, Sparkles, Monitor } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   isConnected: boolean;
   isAdmin: boolean;
+  role: string; // Added to support the superuser condition
   onLogout: () => void;
 }
 
@@ -14,6 +15,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   isConnected,
   isAdmin,
+  role,
   onLogout
 }) => {
   const [logoError, setLogoError] = useState(false);
