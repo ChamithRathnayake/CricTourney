@@ -463,7 +463,7 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
                 <div>
                   <span className="text-[8px] bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider">
                     {isSuperOver 
-                      ? `Super Over ${Math.floor((matchInnings.length - 1) / 2) + 1} - Inn ${matchInnings.length % 2 === 1 ? '01' : '02'}`
+                      ? `Super Over ${Math.floor((matchInnings.length - 1) / 2)} - Inn ${matchInnings.length % 2 === 1 ? '01' : '02'}`
                       : `Batting Inning ${isSecondInning ? '02' : '01'}`}
                   </span>
                   <h2 className="text-lg sm:text-xl font-extrabold text-slate-100 tracking-tight mt-0.5">{battingTeam?.name}</h2>
