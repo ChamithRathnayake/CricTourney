@@ -1310,7 +1310,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
 
   const dynamicWinner = liveMatch ? getMatchWinner(liveMatch, liveInnings, liveDeliveries) : null;
   const secondInning = liveInnings[1];
-  const isSecondInning = liveInnings.length % 2 === 0;
+  const isSecondInning = liveInnings.length >= 2 && liveInnings.length % 2 === 0;
   const secondInningState = secondInning ? getInningState(secondInning, liveDeliveries) : null;
   
   const oversLimit = isSuperOver ? 1 : (liveMatch?.overs_limit || 5);
@@ -2127,7 +2127,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
       {/* ----------------- 3. DETAILED SCORECARD MODAL ----------------- */}
       {selectedPopupMatch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto overflow-x-hidden">
-          <div className="w-full max-w-full sm:max-w-3xl min-w-0 bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl relative flex flex-col max-h-[95svh] sm:max-h-[90svh] overflow-hidden my-auto sm:my-8">
+          <div className="w-full max-w-[calc(100vw-24px)] sm:max-w-3xl min-w-0 bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl relative flex flex-col max-h-[95svh] sm:max-h-[90svh] overflow-hidden my-auto sm:my-8">
 
             {/* Modal Header */}
             <div className="p-4 sm:p-5 border-b border-slate-800/60 flex items-center justify-between shrink-0 gap-4">
@@ -2692,7 +2692,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto overflow-x-hidden">
-            <div className="w-full max-w-full sm:max-w-3xl min-w-0 bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl relative flex flex-col max-h-[95svh] sm:max-h-[90svh] overflow-hidden my-auto sm:my-8">
+            <div className="w-full max-w-[calc(100vw-24px)] sm:max-w-3xl min-w-0 bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl relative flex flex-col max-h-[95svh] sm:max-h-[90svh] overflow-hidden my-auto sm:my-8">
               
               {/* Modal Header */}
               <div className="p-4 sm:p-5 border-b border-slate-800/60 flex items-center justify-between shrink-0 gap-4">

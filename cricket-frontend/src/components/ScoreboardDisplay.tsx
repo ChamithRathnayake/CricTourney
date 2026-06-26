@@ -128,7 +128,7 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
     const matchInnings = allInnings.filter(i => i.match === liveMatch.id);
     
     const activeInning = matchInnings[matchInnings.length - 1];
-    const isSecondInning = matchInnings.length % 2 === 0;
+    const isSecondInning = matchInnings.length >= 2 && matchInnings.length % 2 === 0;
 
     if (!activeInning) {
       return (
