@@ -111,7 +111,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
   const [newUserName, setNewUserName] = useState('');
   const [newUserUsername, setNewUserUsername] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserRole, setNewUserRole] = useState<'scorer' | 'news'>('scorer');
+  const [newUserRole, setNewUserRole] = useState<'scorer' | 'news' | 'display'>('scorer');
   const [isCreatingUser, setIsCreatingUser] = useState(false);
 
   // Add Team Form State
@@ -319,12 +319,10 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
   useEffect(() => {
     const initialMap: Record<string, { team1: string; team2: string }> = {};
     matches.forEach(m => {
-      if (m.stage.startsWith('Quarter Final')) {
-        initialMap[m.id] = {
-          team1: m.team1 || '',
-          team2: m.team2 || ''
-        };
-      }
+      initialMap[m.id] = {
+        team1: m.team1 || '',
+        team2: m.team2 || ''
+      };
     });
     setSelectedDrawTeams(initialMap);
   }, [matches]);
@@ -2816,6 +2814,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
     if (targetMatch) {
       await pb.collection('matches').update(targetMatch.id, {
         [slot]: null,
+        status: 'Upcoming',
         winner: null
       });
       await cascadeResetPromotions(targetMatch);
@@ -2835,22 +2834,17 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
       const matchObj = matches.find(m => m.id === matchId);
       if (!matchObj) return;
 
-      const parsed = parseStage(matchObj.stage);
-      const isFirstRound = parsed.round === totalRounds;
-
       let status: 'Upcoming' | 'Live' | 'Completed' = 'Upcoming';
       let winner = null;
       const t1 = team1Id || null;
       const t2 = team2Id || null;
 
-      if (isFirstRound) {
-        if (t1 && !t2) {
-          status = 'Completed';
-          winner = t1;
-        } else if (!t1 && t2) {
-          status = 'Completed';
-          winner = t2;
-        }
+      if (t1 && !t2) {
+        status = 'Completed';
+        winner = t1;
+      } else if (!t1 && t2) {
+        status = 'Completed';
+        winner = t2;
       }
 
       // 1. Update the matchup
@@ -3284,15 +3278,18 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
 
   const getTeamSelectionInfo = (teamId: string, currentMatchId: string) => {
     if (!teamId) return '';
+    const currentMatch = matches.find(m => m.id === currentMatchId);
+    if (!currentMatch) return '';
+    const currentRound = parseStage(currentMatch.stage).round;
+
     const selections: string[] = [];
 
     matches.forEach(m => {
       const parsed = parseStage(m.stage);
-      const isFirstRound = parsed.round === totalRounds;
-      if (!isFirstRound) return;
+      if (parsed.round !== currentRound) return;
 
-      const t1 = selectedDrawTeams[m.id]?.team1 || m.team1 || '';
-      const t2 = selectedDrawTeams[m.id]?.team2 || m.team2 || '';
+      const t1 = selectedDrawTeams[m.id]?.team1 !== undefined ? selectedDrawTeams[m.id].team1 : (m.team1 || '');
+      const t2 = selectedDrawTeams[m.id]?.team2 !== undefined ? selectedDrawTeams[m.id].team2 : (m.team2 || '');
 
       if (m.id === currentMatchId) {
         // do not check ourselves
@@ -3951,11 +3948,12 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                         <label className="block text-[10px] font-bold text-slate-455 uppercase mb-1.5">Account Role</label>
                         <select
                           value={newUserRole}
-                          onChange={(e) => setNewUserRole(e.target.value as 'scorer' | 'news')}
+                          onChange={(e) => setNewUserRole(e.target.value as 'scorer' | 'news' | 'display')}
                           className="w-full bg-slate-950/60 border border-slate-850 rounded-xl py-2 px-3 text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50"
                         >
                           <option value="scorer">Live Scorer Only</option>
                           <option value="news">News Manager Only</option>
+                          <option value="display">Scoreboard TV/LED Display Only</option>
                         </select>
                       </div>
 
@@ -3983,7 +3981,11 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                     <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
                       {portalUsers.map((user) => {
                         const email = user.email || '';
-                        const resolvedRole = email.includes('news') || email.includes('media') || email.includes('pr') ? 'news' : 'scorer';
+                        const resolvedRole = email.includes('news') || email.includes('media') || email.includes('pr')
+                          ? 'news'
+                          : email.includes('display') || email.includes('screen') || email.includes('led')
+                            ? 'display'
+                            : 'scorer';
                         
                         return (
                           <div key={user.id} className="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/40 border border-slate-900/60">
@@ -3996,9 +3998,11 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                               <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
                                 resolvedRole === 'news'
                                   ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
-                                  : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
+                                  : resolvedRole === 'display'
+                                    ? 'bg-violet-500/10 text-violet-300 border-violet-500/20'
+                                    : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
                               }`}>
-                                {resolvedRole === 'news' ? 'News Manager' : 'Live Scorer'}
+                                {resolvedRole === 'news' ? 'News Manager' : resolvedRole === 'display' ? 'Display User' : 'Live Scorer'}
                               </span>
                               
                               <button
@@ -4161,15 +4165,50 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-sans">
                       {roundMatches.map((match) => {
                         const parsed = parseStage(match.stage);
+
+                        const t1Val = selectedDrawTeams[match.id]?.team1 !== undefined ? selectedDrawTeams[match.id].team1 : (match.team1 || '');
+                        const t2Val = selectedDrawTeams[match.id]?.team2 !== undefined ? selectedDrawTeams[match.id].team2 : (match.team2 || '');
+
+                        const team1Obj = getTeam(t1Val);
+                        const team2Obj = getTeam(t2Val);
+
                         const isFirstRound = parsed.round === totalRounds;
+                        
+                        let eligibleTeams1: Team[] = [];
+                        let eligibleTeams2: Team[] = [];
+                        
+                        if (isFirstRound) {
+                          eligibleTeams1 = teams;
+                          eligibleTeams2 = teams;
+                        } else {
+                          const prevRoundNum = parsed.round + 1;
+                          
+                          // Find feeding match for team1
+                          const stage1Name = getStageName(prevRoundNum, 2 * parsed.matchIndex - 1);
+                          const feed1 = matches.find(m => m.stage === stage1Name);
+                          if (feed1) {
+                            const candidates = feed1.winner 
+                              ? [feed1.winner] 
+                              : [feed1.team1, feed1.team2].filter(Boolean) as string[];
+                            if (match.team1) candidates.push(match.team1);
+                            if (t1Val) candidates.push(t1Val);
+                            eligibleTeams1 = teams.filter(t => candidates.includes(t.id));
+                          }
+                          
+                          // Find feeding match for team2
+                          const stage2Name = getStageName(prevRoundNum, 2 * parsed.matchIndex);
+                          const feed2 = matches.find(m => m.stage === stage2Name);
+                          if (feed2) {
+                            const candidates = feed2.winner 
+                              ? [feed2.winner] 
+                              : [feed2.team1, feed2.team2].filter(Boolean) as string[];
+                            if (match.team2) candidates.push(match.team2);
+                            if (t2Val) candidates.push(t2Val);
+                            eligibleTeams2 = teams.filter(t => candidates.includes(t.id));
+                          }
+                        }
 
-                        const t1Val = selectedDrawTeams[match.id]?.team1 || match.team1 || '';
-                        const t2Val = selectedDrawTeams[match.id]?.team2 || match.team2 || '';
-
-                        const team1Obj = isFirstRound ? getTeam(t1Val) : getTeam(match.team1);
-                        const team2Obj = isFirstRound ? getTeam(t2Val) : getTeam(match.team2);
-
-                        const isMatchLocked = match.status === 'Live' || match.status === 'Completed';
+                        const isMatchLocked = match.status === 'Live' || (match.status === 'Completed' && !!match.team1 && !!match.team2);
 
                         // Next stage routing description
                         let routingText = "";
@@ -4188,7 +4227,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                               <div className="flex items-center justify-between mb-4 border-b border-slate-800/60 pb-3">
                                 <div>
                                   <h4 className="text-sm font-bold text-slate-200">
-                                    {isFirstRound && (match.team1 && !match.team2) ? `${match.stage} (BYE)` : match.stage}
+                                    {((match.team1 && !match.team2) || (!match.team1 && match.team2)) ? `${match.stage} (BYE)` : match.stage}
                                   </h4>
                                   <span className="text-[10px] text-slate-500 block mt-0.5">{routingText}</span>
                                 </div>
@@ -4226,153 +4265,104 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                               </div>
 
                               {/* Team Selection / Info Layout */}
-                              {isFirstRound ? (
-                                <div className="space-y-4">
-                                  {/* Team 1 Selector */}
-                                  <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex justify-between">
-                                      <span>Team 1</span>
-                                      {team1Obj && <span className="text-slate-500">{team1Obj.name}</span>}
-                                    </label>
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-8 h-8 rounded-lg bg-slate-900/80 border border-slate-800 flex items-center justify-center shrink-0">
-                                        {team1Obj && getTeamLogo(team1Obj) ? (
-                                          <img
-                                            src={getTeamLogo(team1Obj)}
-                                            alt={team1Obj.short_name}
-                                            className="w-6 h-6 rounded object-cover"
-                                          />
-                                        ) : (
-                                          <span className="text-xs font-bold text-slate-500">{team1Obj?.short_name || '?'}</span>
-                                        )}
-                                      </div>
-                                      <select
-                                        value={t1Val}
-                                        disabled={isMatchLocked}
-                                        onChange={(e) => handleDrawTeamChange(match.id, 'team1', e.target.value)}
-                                        className="w-full bg-slate-950/40 border border-slate-800/60 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                      >
-                                        <option value="">-- BYE (Pass) --</option>
-                                        {teams.map((t) => (
-                                          <option key={t.id} value={t.id}>
-                                            {t.name} ({t.short_name}){getTeamSelectionInfo(t.id, match.id)}
-                                          </option>
-                                        ))}
-                                      </select>
+                              <div className="space-y-4">
+                                {/* Team 1 Selector */}
+                                <div className="space-y-1.5">
+                                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex justify-between">
+                                    <span>Team 1</span>
+                                    {team1Obj && <span className="text-slate-500">{team1Obj.name}</span>}
+                                  </label>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-lg bg-slate-900/80 border border-slate-800 flex items-center justify-center shrink-0">
+                                      {team1Obj && getTeamLogo(team1Obj) ? (
+                                        <img
+                                          src={getTeamLogo(team1Obj)}
+                                          alt={team1Obj.short_name}
+                                          className="w-6 h-6 rounded object-cover"
+                                        />
+                                      ) : (
+                                        <span className="text-xs font-bold text-slate-500">{team1Obj?.short_name || '?'}</span>
+                                      )}
                                     </div>
-                                  </div>
-
-                                  {/* VS Separator */}
-                                  <div className="flex items-center justify-center">
-                                    <span className="text-[10px] font-extrabold text-slate-650 bg-slate-900 px-3 py-1 rounded-full border border-slate-800/80">VS</span>
-                                  </div>
-
-                                  {/* Team 2 Selector */}
-                                  <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex justify-between">
-                                      <span>Team 2</span>
-                                      {team2Obj && <span className="text-slate-500">{team2Obj.name}</span>}
-                                    </label>
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-8 h-8 rounded-lg bg-slate-900/80 border border-slate-800 flex items-center justify-center shrink-0">
-                                        {team2Obj && getTeamLogo(team2Obj) ? (
-                                          <img
-                                            src={getTeamLogo(team2Obj)}
-                                            alt={team2Obj.short_name}
-                                            className="w-6 h-6 rounded object-cover"
-                                          />
-                                        ) : (
-                                          <span className="text-xs font-bold text-slate-500">{team2Obj?.short_name || '?'}</span>
-                                        )}
-                                      </div>
-                                      <select
-                                        value={t2Val}
-                                        disabled={isMatchLocked}
-                                        onChange={(e) => handleDrawTeamChange(match.id, 'team2', e.target.value)}
-                                        className="w-full bg-slate-950/40 border border-slate-800/60 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                      >
-                                        <option value="">-- BYE (Pass) --</option>
-                                        {teams.map((t) => (
-                                          <option key={t.id} value={t.id}>
-                                            {t.name} ({t.short_name}){getTeamSelectionInfo(t.id, match.id)}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
+                                    <select
+                                      value={t1Val}
+                                      disabled={isMatchLocked}
+                                      onChange={(e) => handleDrawTeamChange(match.id, 'team1', e.target.value)}
+                                      className="w-full bg-slate-950/40 border border-slate-800/60 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      <option value="">-- BYE (Pass) --</option>
+                                      {eligibleTeams1.map((t) => (
+                                        <option key={t.id} value={t.id}>
+                                          {t.name} ({t.short_name}){getTeamSelectionInfo(t.id, match.id)}
+                                        </option>
+                                      ))}
+                                    </select>
                                   </div>
                                 </div>
-                              ) : (
-                                <div className="space-y-4">
-                                  {/* Team 1 Display */}
-                                  <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Team 1</label>
-                                    <div className="flex items-center gap-2 p-2 bg-slate-950/20 border border-slate-900/40 rounded-xl">
-                                      <div className="w-8 h-8 rounded-lg bg-slate-900/80 border border-slate-700/50 flex items-center justify-center font-bold text-xs text-slate-300">
-                                        {team1Obj && getTeamLogo(team1Obj) ? (
-                                          <img
-                                            src={getTeamLogo(team1Obj)}
-                                            alt={team1Obj.short_name}
-                                            className="w-6 h-6 rounded object-cover"
-                                          />
-                                        ) : (
-                                          <span>{team1Obj?.short_name || '?'}</span>
-                                        )}
-                                      </div>
-                                      <span className="text-xs font-semibold text-slate-200">{team1Obj?.name || 'TBD'}</span>
-                                    </div>
-                                  </div>
 
-                                  {/* VS Separator */}
-                                  <div className="flex items-center justify-center">
-                                    <span className="text-[10px] font-extrabold text-slate-650 bg-slate-900 px-3 py-1 rounded-full border border-slate-800/80">VS</span>
-                                  </div>
+                                {/* VS Separator */}
+                                <div className="flex items-center justify-center">
+                                  <span className="text-[10px] font-extrabold text-slate-650 bg-slate-900 px-3 py-1 rounded-full border border-slate-800/80">VS</span>
+                                </div>
 
-                                  {/* Team 2 Display */}
-                                  <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Team 2</label>
-                                    <div className="flex items-center gap-2 p-2 bg-slate-950/20 border border-slate-900/40 rounded-xl">
-                                      <div className="w-8 h-8 rounded-lg bg-slate-900/80 border border-slate-700/50 flex items-center justify-center font-bold text-xs text-slate-300">
-                                        {team2Obj && getTeamLogo(team2Obj) ? (
-                                          <img
-                                            src={getTeamLogo(team2Obj)}
-                                            alt={team2Obj.short_name}
-                                            className="w-6 h-6 rounded object-cover"
-                                          />
-                                        ) : (
-                                          <span>{team2Obj?.short_name || '?'}</span>
-                                        )}
-                                      </div>
-                                      <span className="text-xs font-semibold text-slate-200">{team2Obj?.name || 'TBD'}</span>
+                                {/* Team 2 Selector */}
+                                <div className="space-y-1.5">
+                                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex justify-between">
+                                    <span>Team 2</span>
+                                    {team2Obj && <span className="text-slate-500">{team2Obj.name}</span>}
+                                  </label>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-lg bg-slate-900/80 border border-slate-800 flex items-center justify-center shrink-0">
+                                      {team2Obj && getTeamLogo(team2Obj) ? (
+                                        <img
+                                          src={getTeamLogo(team2Obj)}
+                                          alt={team2Obj.short_name}
+                                          className="w-6 h-6 rounded object-cover"
+                                        />
+                                      ) : (
+                                        <span className="text-xs font-bold text-slate-500">{team2Obj?.short_name || '?'}</span>
+                                      )}
                                     </div>
+                                    <select
+                                      value={t2Val}
+                                      disabled={isMatchLocked}
+                                      onChange={(e) => handleDrawTeamChange(match.id, 'team2', e.target.value)}
+                                      className="w-full bg-slate-950/40 border border-slate-800/60 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      <option value="">-- BYE (Pass) --</option>
+                                      {eligibleTeams2.map((t) => (
+                                        <option key={t.id} value={t.id}>
+                                          {t.name} ({t.short_name}){getTeamSelectionInfo(t.id, match.id)}
+                                        </option>
+                                      ))}
+                                    </select>
                                   </div>
                                 </div>
-                              )}
+                              </div>
                             </div>
 
                             {/* Button Action */}
-                            {isFirstRound && (
-                              <div className="mt-6 pt-4 border-t border-slate-800/60">
-                                {isMatchLocked ? (
-                                  <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-950/20 px-3 py-2 rounded-xl border border-slate-850">
-                                    <span className="w-2 h-2 rounded-full bg-slate-600" />
-                                    Match is {match.status}. Setup is locked to preserve records.
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={() => handleUpdateMatchup(match.id, t1Val, t2Val)}
-                                    disabled={(t1Val === t2Val && t1Val !== '') || (!t1Val && !t2Val)}
-                                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold py-2 px-4 rounded-xl shadow-lg transition-all duration-300 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                                  >
-                                    Update Matchup
-                                  </button>
-                                )}
-                                {t1Val && t2Val && t1Val === t2Val && (
-                                  <p className="text-[10px] text-rose-400 mt-2 text-center">
-                                    Warning: A team cannot play against itself.
-                                  </p>
-                                )}
-                              </div>
-                            )}
+                            <div className="mt-6 pt-4 border-t border-slate-800/60">
+                              {isMatchLocked ? (
+                                <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-950/20 px-3 py-2 rounded-xl border border-slate-850">
+                                  <span className="w-2 h-2 rounded-full bg-slate-600" />
+                                  Match is {match.status}. Setup is locked to preserve records.
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => handleUpdateMatchup(match.id, t1Val, t2Val)}
+                                  disabled={(t1Val === t2Val && t1Val !== '') || (!t1Val && !t2Val)}
+                                  className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold py-2 px-4 rounded-xl shadow-lg transition-all duration-300 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  Update Matchup
+                                </button>
+                              )}
+                              {t1Val && t2Val && t1Val === t2Val && (
+                                <p className="text-[10px] text-rose-400 mt-2 text-center">
+                                  Warning: A team cannot play against itself.
+                                </p>
+                              )}
+                            </div>
 
                             {(match.status === 'Completed' || match.status === 'Live') && (
                               <div className="mt-4 pt-4 border-t border-slate-800/60">
