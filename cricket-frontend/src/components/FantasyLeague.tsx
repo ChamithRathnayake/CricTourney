@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { pb, getTeamLogo, getFileUrl } from '../services/pocketbase';
 import type { Player, Team, Delivery, Match, FantasyTeam, TournamentConfig } from '../services/pocketbase';
-import { Trophy, Users, Sparkles, Trash2, Save, Search, Info, ShieldAlert, BadgeInfo } from 'lucide-react';
+import { Trophy, Users, Sparkles, Trash2, Save, Search, Info, ShieldAlert, BadgeInfo, LayoutGrid, List } from 'lucide-react';
 
 interface FantasyLeagueProps {
   players: Player[];
@@ -98,6 +98,7 @@ export const FantasyLeague: React.FC<FantasyLeagueProps> = ({ players, teams, ma
   const [viceCaptainId, setViceCaptainId] = useState<string>('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [saveMessage, setSaveMessage] = useState('');
+  const [dreamTeamView, setDreamTeamView] = useState<'field' | 'list'>('field');
 
   const fetchData = async () => {
     try {
@@ -603,350 +604,257 @@ export const FantasyLeague: React.FC<FantasyLeagueProps> = ({ players, teams, ma
                   : 'The absolute highest-scoring 11-player lineup based on real statistics. Updates live as matches progress.'}
               </p>
             </div>
-            <div className={`border py-1.5 px-4 rounded-xl shrink-0 text-center sm:text-left transition-all ${
+            <div className="flex flex-wrap items-center gap-3 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
+              {/* Toggle View */}
+              <div className="flex items-center bg-slate-950/80 p-0.5 rounded-lg border border-slate-855">
+                <button
+                  onClick={() => setDreamTeamView('field')}
+                  className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all flex items-center gap-1.5 ${
+                    dreamTeamView === 'field'
+                      ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-450'
+                      : 'border border-transparent text-slate-450 hover:text-slate-200'
+                  }`}
+                >
+                  <LayoutGrid className="w-3 h-3" />
+                  <span>Field</span>
+                </button>
+                <button
+                  onClick={() => setDreamTeamView('list')}
+                  className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all flex items-center gap-1.5 ${
+                    dreamTeamView === 'list'
+                      ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-455'
+                      : 'border border-transparent text-slate-450 hover:text-slate-200'
+                  }`}
+                >
+                  <List className="w-3 h-3" />
+                  <span>List</span>
+                </button>
+              </div>
+
+              {/* Dream Team Score */}
+              <div className={`border py-1 px-3.5 rounded-xl text-center sm:text-left transition-all ${
+                isFinalCompleted
+                  ? 'bg-amber-955/80 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.1)]'
+                  : 'bg-slate-955/80 border-slate-850'
+              }`}>
+                <span className="text-[7.5px] text-slate-550 font-black uppercase tracking-widest block">Dream Team Score</span>
+                <span className={`text-sm font-black ${isFinalCompleted ? 'text-amber-300' : 'text-amber-400'}`}>{tournamentDreamTeam.totalPoints.toFixed(1)} pts</span>
+              </div>
+            </div>
+          </div>
+
+          {dreamTeamView === 'field' ? (
+            /* Virtual Cricket Pitch Field */
+            <div className={`relative w-full max-w-xl mx-auto aspect-[3/4] sm:aspect-[16/11] rounded-2xl overflow-hidden shadow-2xl select-none transition-all duration-500 ${
               isFinalCompleted
-                ? 'bg-amber-950/80 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.1)]'
-                : 'bg-slate-950/80 border-slate-850'
+                ? 'border border-amber-500/40 bg-gradient-to-b from-emerald-900/45 via-amber-500/10 to-emerald-900/45 shadow-[inset_0_0_30px_rgba(245,158,11,0.25)]'
+                : 'border border-emerald-950/80 bg-gradient-to-b from-emerald-900/35 via-emerald-950/20 to-emerald-900/35'
             }`}>
-              <span className="text-[8px] text-slate-550 font-black uppercase tracking-widest block">Dream Team Score</span>
-              <span className={`text-lg font-black ${isFinalCompleted ? 'text-amber-300' : 'text-amber-400'}`}>{tournamentDreamTeam.totalPoints.toFixed(1)} pts</span>
-            </div>
-          </div>
-
-          {/* Virtual Cricket Pitch Field */}
-          <div className={`relative w-full max-w-xl mx-auto aspect-[3/4] sm:aspect-[16/11] rounded-2xl overflow-hidden shadow-2xl select-none transition-all duration-500 ${
-            isFinalCompleted
-              ? 'border border-amber-500/40 bg-gradient-to-b from-emerald-900/45 via-amber-500/10 to-emerald-900/45 shadow-[inset_0_0_30px_rgba(245,158,11,0.25)]'
-              : 'border border-emerald-950/80 bg-gradient-to-b from-emerald-900/35 via-emerald-950/20 to-emerald-900/35'
-          }`}>
-            {/* Turf details */}
-            <div className="absolute inset-3 border border-emerald-500/5 rounded-xl pointer-events-none" />
-            <div className="absolute top-1/2 left-0 right-0 border-t border-dashed border-emerald-500/5 pointer-events-none" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 border border-emerald-500/5 rounded-full pointer-events-none" />
-            
-            {/* Celebrate overlay */}
-            {isFinalCompleted && (
-              <>
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(245,158,11,0.1),transparent_75%)] pointer-events-none animate-pulse" />
-                {/* Sparkles */}
-                <div className="absolute top-10 left-10 text-xs animate-bounce pointer-events-none opacity-45 delay-75">✨</div>
-                <div className="absolute top-20 right-12 text-xs animate-bounce pointer-events-none opacity-35 delay-300">⭐</div>
-                <div className="absolute bottom-16 left-16 text-xs animate-bounce pointer-events-none opacity-40 delay-200">⭐</div>
-                <div className="absolute bottom-12 right-20 text-xs animate-bounce pointer-events-none opacity-50 delay-500">✨</div>
-              </>
-            )}
-
-            {/* The Pitch strip */}
-            <div className="absolute top-1/5 bottom-1/5 left-1/2 -translate-x-1/2 w-11 bg-amber-955/10 border-l border-r border-emerald-950/20 rounded-sm pointer-events-none flex flex-col justify-between py-2">
-              <div className="h-0.5 w-full bg-slate-100/5" />
-              <div className="h-0.5 w-full bg-slate-100/5" />
-            </div>
-
-            {/* Players on Pitch grouped by roles */}
-            <div className="absolute inset-0 flex flex-col justify-between py-4 px-2 sm:px-4 z-10">
+              {/* Turf details */}
+              <div className="absolute inset-3 border border-emerald-500/5 rounded-xl pointer-events-none" />
+              <div className="absolute top-1/2 left-0 right-0 border-t border-dashed border-emerald-500/5 pointer-events-none" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 border border-emerald-500/5 rounded-full pointer-events-none" />
               
-              {/* Row 1: Wicket Keepers */}
-              <div className="flex justify-center gap-2 sm:gap-6">
-                {tournamentDreamTeam.players.filter(p => p.role === 'Wicket Keeper').map(player => {
-                  const isTopOverall = player.id === topPerformancePlayerId;
-                  return (
-                    <div key={player.id} className="flex flex-col items-center relative">
-                      <div className="relative">
-                        {isTopOverall && (
-                          <>
-                            <div className="absolute -top-2.5 sm:-top-3.5 left-1/2 -translate-x-1/2 text-[9px] sm:text-[11px] animate-bounce z-30 filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">👑</div>
-                            <div className="absolute inset-0 rounded-full bg-amber-500/25 animate-ping pointer-events-none" />
-                          </>
-                        )}
-                        {player.photo ? (
-                          <img
-                            src={getFileUrl('players', player.id, player.photo)}
-                            alt=""
-                            className={`w-7 h-7 sm:w-8.5 sm:h-8.5 rounded-full object-cover shadow-md transition-all ${
-                              isTopOverall
-                                ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-955 shadow-[0_0_15px_rgba(245,158,11,0.85)] border-amber-450'
-                                : isFinalCompleted
-                                ? 'ring-1 ring-amber-500/40 ring-offset-1 ring-offset-slate-900 border-amber-500/30'
-                                : 'border border-emerald-450/70'
-                            }`}
-                          />
-                        ) : (
-                          <div className={`w-7 h-7 sm:w-8.5 sm:h-8.5 rounded-full bg-gradient-to-br border flex items-center justify-center text-[7px] sm:text-[9px] font-black uppercase shadow-md transition-all ${
-                            isTopOverall
-                              ? 'from-amber-400 to-yellow-500 border-amber-300 ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.85)] text-slate-955'
-                              : isFinalCompleted
-                              ? 'from-amber-600/40 to-yellow-750/30 border-amber-500/35 text-amber-200'
-                              : 'from-emerald-500 to-teal-650 border-emerald-555 text-white'
-                          }`}>
-                            {player.name.substring(0, 2)}
-                          </div>
-                        )}
-                        {player.id === tournamentDreamTeam.captainId && (
-                          <span className="absolute -top-1 sm:-top-1.5 -right-1 sm:-right-1.5 bg-amber-500 text-slate-955 text-[5.5px] sm:text-[7.5px] font-black w-3 h-3 sm:w-4 sm:h-4 rounded-full flex items-center justify-center border border-slate-950 shadow-md">C</span>
-                        )}
-                        {player.id === tournamentDreamTeam.viceCaptainId && (
-                          <span className="absolute -top-1 sm:-top-1.5 -right-1 sm:-right-1.5 bg-slate-350 text-slate-955 text-[5.5px] sm:text-[7.5px] font-black w-3 h-3 sm:w-4 sm:h-4 rounded-full flex items-center justify-center border border-slate-950 shadow-md">VC</span>
-                        )}
-                      </div>
-                      <span className={`text-[7px] sm:text-[8.5px] font-extrabold mt-1 px-1 sm:px-2 py-0.1 sm:py-0.5 rounded-full shadow-sm truncate max-w-[65px] sm:max-w-[80px] transition-all ${
-                        isTopOverall
-                          ? 'text-amber-300 bg-amber-955/95 border border-amber-400 font-black scale-105 shadow-[0_2px_6px_rgba(245,158,11,0.3)]'
-                          : isFinalCompleted
-                          ? 'text-amber-200 bg-amber-955/80 border border-amber-500/30'
-                          : 'text-slate-100 bg-slate-950/80 border border-slate-850'
-                      }`}>
-                        {player.name.split(' (')[0]}
-                      </span>
-                      <span className={`text-[6px] sm:text-[7px] font-bold bg-slate-950/85 px-1 sm:px-1.5 rounded-md mt-0.5 opacity-90 border transition-all ${
-                        isTopOverall
-                          ? 'text-amber-400 border-amber-500/40'
-                          : isFinalCompleted
-                          ? 'text-amber-300/85 border-amber-500/20'
-                          : 'text-emerald-450 border-slate-900'
-                      }`}>
-                        {player.points} pts • {selectionMap[player.id]}%
-                      </span>
-                      {(() => {
-                        const badge = getPlayerHighlightBadge(player.id);
-                        if (!badge) return null;
-                        return (
-                          <span className={`inline-block text-[5px] sm:text-[6px] px-1 py-0.1 rounded mt-0.5 uppercase tracking-wider scale-80 sm:scale-90 ${badge.style}`}>
-                            {badge.text.replace('👑 ', '').replace('⚡ ', '').replace('🌟 ', '')}
-                          </span>
-                        );
-                      })()}
-                    </div>
-                  );
-                })}
+              {/* Celebrate overlay */}
+              {isFinalCompleted && (
+                <>
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(245,158,11,0.1),transparent_75%)] pointer-events-none animate-pulse" />
+                  {/* Sparkles */}
+                  <div className="absolute top-10 left-10 text-xs animate-bounce pointer-events-none opacity-45 delay-75">✨</div>
+                  <div className="absolute top-20 right-12 text-xs animate-bounce pointer-events-none opacity-35 delay-300">⭐</div>
+                  <div className="absolute bottom-16 left-16 text-xs animate-bounce pointer-events-none opacity-40 delay-200">⭐</div>
+                  <div className="absolute bottom-12 right-20 text-xs animate-bounce pointer-events-none opacity-50 delay-500">✨</div>
+                </>
+              )}
+
+              {/* The Pitch strip */}
+              <div className="absolute top-1/5 bottom-1/5 left-1/2 -translate-x-1/2 w-11 bg-amber-955/10 border-l border-r border-emerald-950/20 rounded-sm pointer-events-none flex flex-col justify-between py-2">
+                <div className="h-0.5 w-full bg-slate-100/5" />
+                <div className="h-0.5 w-full bg-slate-100/5" />
               </div>
 
-              {/* Row 2: Batters */}
-              <div className="flex justify-center gap-2 sm:gap-6">
-                {tournamentDreamTeam.players.filter(p => p.role === 'Batter').map(player => {
-                  const isTopOverall = player.id === topPerformancePlayerId;
-                  return (
-                    <div key={player.id} className="flex flex-col items-center relative">
-                      <div className="relative">
-                        {isTopOverall && (
-                          <>
-                            <div className="absolute -top-2.5 sm:-top-3.5 left-1/2 -translate-x-1/2 text-[9px] sm:text-[11px] animate-bounce z-30 filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">👑</div>
-                            <div className="absolute inset-0 rounded-full bg-amber-500/25 animate-ping pointer-events-none" />
-                          </>
-                        )}
-                        {player.photo ? (
-                          <img
-                            src={getFileUrl('players', player.id, player.photo)}
-                            alt=""
-                            className={`w-7 h-7 sm:w-8.5 sm:h-8.5 rounded-full object-cover shadow-md transition-all ${
-                              isTopOverall
-                                ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-955 shadow-[0_0_15px_rgba(245,158,11,0.85)] border-amber-450'
-                                : isFinalCompleted
-                                ? 'ring-1 ring-amber-500/40 ring-offset-1 ring-offset-slate-900 border-amber-500/30'
-                                : 'border border-emerald-450/70'
-                            }`}
-                          />
-                        ) : (
-                          <div className={`w-7 h-7 sm:w-8.5 sm:h-8.5 rounded-full bg-gradient-to-br border flex items-center justify-center text-[7px] sm:text-[9px] font-black uppercase shadow-md transition-all ${
-                            isTopOverall
-                              ? 'from-amber-400 to-yellow-500 border-amber-300 ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-955 shadow-[0_0_15px_rgba(245,158,11,0.85)] text-slate-955'
-                              : isFinalCompleted
-                              ? 'from-amber-600/40 to-yellow-750/30 border-amber-500/35 text-amber-200'
-                              : 'from-emerald-500 to-teal-650 border-emerald-555 text-white'
-                          }`}>
-                            {player.name.substring(0, 2)}
-                          </div>
-                        )}
-                        {player.id === tournamentDreamTeam.captainId && (
-                          <span className="absolute -top-1 sm:-top-1.5 -right-1 sm:-right-1.5 bg-amber-500 text-slate-955 text-[5.5px] sm:text-[7.5px] font-black w-3 h-3 sm:w-4 sm:h-4 rounded-full flex items-center justify-center border border-slate-950 shadow-md">C</span>
-                        )}
-                        {player.id === tournamentDreamTeam.viceCaptainId && (
-                          <span className="absolute -top-1 sm:-top-1.5 -right-1 sm:-right-1.5 bg-slate-350 text-slate-955 text-[5.5px] sm:text-[7.5px] font-black w-3 h-3 sm:w-4 sm:h-4 rounded-full flex items-center justify-center border border-slate-950 shadow-md">VC</span>
-                        )}
-                      </div>
-                      <span className={`text-[7px] sm:text-[8.5px] font-extrabold mt-1 px-1 sm:px-2 py-0.1 sm:py-0.5 rounded-full shadow-sm truncate max-w-[65px] sm:max-w-[80px] transition-all ${
-                        isTopOverall
-                          ? 'text-amber-300 bg-amber-955/95 border border-amber-400 font-black scale-105 shadow-[0_2px_6px_rgba(245,158,11,0.3)]'
-                          : isFinalCompleted
-                          ? 'text-amber-200 bg-amber-955/80 border border-amber-500/30'
-                          : 'text-slate-100 bg-slate-950/80 border border-slate-850'
-                      }`}>
-                        {player.name.split(' (')[0]}
-                      </span>
-                      <span className={`text-[6px] sm:text-[7px] font-bold bg-slate-950/85 px-1 sm:px-1.5 rounded-md mt-0.5 opacity-90 border transition-all ${
-                        isTopOverall
-                          ? 'text-amber-400 border-amber-500/40'
-                          : isFinalCompleted
-                          ? 'text-amber-300/85 border-amber-500/20'
-                          : 'text-emerald-450 border-slate-900'
-                      }`}>
-                        {player.points} pts • {selectionMap[player.id]}%
-                      </span>
-                      {(() => {
-                        const badge = getPlayerHighlightBadge(player.id);
-                        if (!badge) return null;
-                        return (
-                          <span className={`inline-block text-[5px] sm:text-[6px] px-1 py-0.1 rounded mt-0.5 uppercase tracking-wider scale-80 sm:scale-90 ${badge.style}`}>
-                            {badge.text.replace('👑 ', '').replace('⚡ ', '').replace('🌟 ', '')}
-                          </span>
-                        );
-                      })()}
-                    </div>
-                  );
-                })}
-              </div>
+              {/* Players on Pitch grouped by roles */}
+              <div className="absolute inset-0 flex flex-col justify-between py-4 px-2 sm:px-4 z-10">
+                {(() => {
+                  const rolePriority = {
+                    'Wicket Keeper': 1,
+                    'Batter': 2,
+                    'All-Rounder': 3,
+                    'Bawler': 4
+                  };
+                  const sortedPlayersForPitch = [...tournamentDreamTeam.players].sort((a, b) => {
+                    const prioA = rolePriority[a.role as keyof typeof rolePriority] || 99;
+                    const prioB = rolePriority[b.role as keyof typeof rolePriority] || 99;
+                    return prioA - prioB;
+                  });
 
-              {/* Row 3: All-Rounders */}
-              <div className="flex justify-center gap-2 sm:gap-6">
-                {tournamentDreamTeam.players.filter(p => p.role === 'All-Rounder').map(player => {
-                  const isTopOverall = player.id === topPerformancePlayerId;
-                  return (
-                    <div key={player.id} className="flex flex-col items-center relative">
-                      <div className="relative">
-                        {isTopOverall && (
-                          <>
-                            <div className="absolute -top-2.5 sm:-top-3.5 left-1/2 -translate-x-1/2 text-[9px] sm:text-[11px] animate-bounce z-30 filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">👑</div>
-                            <div className="absolute inset-0 rounded-full bg-amber-500/25 animate-ping pointer-events-none" />
-                          </>
-                        )}
-                        {player.photo ? (
-                          <img
-                            src={getFileUrl('players', player.id, player.photo)}
-                            alt=""
-                            className={`w-7 h-7 sm:w-8.5 sm:h-8.5 rounded-full object-cover shadow-md transition-all ${
-                              isTopOverall
-                                ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-955 shadow-[0_0_15px_rgba(245,158,11,0.85)] border-amber-450'
-                                : isFinalCompleted
-                                ? 'ring-1 ring-amber-500/40 ring-offset-1 ring-offset-slate-900 border-amber-500/30'
-                                : 'border border-emerald-450/70'
-                            }`}
-                          />
-                        ) : (
-                          <div className={`w-7 h-7 sm:w-8.5 sm:h-8.5 rounded-full bg-gradient-to-br border flex items-center justify-center text-[7px] sm:text-[9px] font-black uppercase shadow-md transition-all ${
-                            isTopOverall
-                              ? 'from-amber-400 to-yellow-500 border-amber-305 ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-955 shadow-[0_0_15px_rgba(245,158,11,0.85)] text-slate-955'
-                              : isFinalCompleted
-                              ? 'from-amber-600/40 to-yellow-750/30 border-amber-500/35 text-amber-200'
-                              : 'from-emerald-500 to-teal-650 border-emerald-555 text-white'
-                          }`}>
-                            {player.name.substring(0, 2)}
-                          </div>
-                        )}
-                        {player.id === tournamentDreamTeam.captainId && (
-                          <span className="absolute -top-1 sm:-top-1.5 -right-1 sm:-right-1.5 bg-amber-500 text-slate-950 text-[5.5px] sm:text-[7.5px] font-black w-3 h-3 sm:w-4 sm:h-4 rounded-full flex items-center justify-center border border-slate-950 shadow-md">C</span>
-                        )}
-                        {player.id === tournamentDreamTeam.viceCaptainId && (
-                          <span className="absolute -top-1 sm:-top-1.5 -right-1 sm:-right-1.5 bg-slate-355 text-slate-950 text-[5.5px] sm:text-[7.5px] font-black w-3 h-3 sm:w-4 sm:h-4 rounded-full flex items-center justify-center border border-slate-950 shadow-md">VC</span>
-                        )}
-                      </div>
-                      <span className={`text-[7px] sm:text-[8.5px] font-extrabold mt-1 px-1 sm:px-2 py-0.1 sm:py-0.5 rounded-full shadow-sm truncate max-w-[65px] sm:max-w-[80px] transition-all ${
-                        isTopOverall
-                          ? 'text-amber-305 bg-amber-955/95 border border-amber-400 font-black scale-105 shadow-[0_2px_6px_rgba(245,158,11,0.3)]'
-                          : isFinalCompleted
-                          ? 'text-amber-200 bg-amber-955/80 border border-amber-500/30'
-                          : 'text-slate-100 bg-slate-950/80 border border-slate-850'
-                      }`}>
-                        {player.name.split(' (')[0]}
-                      </span>
-                      <span className={`text-[6px] sm:text-[7px] font-bold bg-slate-950/85 px-1 sm:px-1.5 rounded-md mt-0.5 opacity-90 border transition-all ${
-                        isTopOverall
-                          ? 'text-amber-400 border-amber-500/40'
-                          : isFinalCompleted
-                          ? 'text-amber-300/85 border-amber-500/20'
-                          : 'text-emerald-450 border-slate-900'
-                      }`}>
-                        {player.points} pts • {selectionMap[player.id]}%
-                      </span>
-                      {(() => {
-                        const badge = getPlayerHighlightBadge(player.id);
-                        if (!badge) return null;
-                        return (
-                          <span className={`inline-block text-[5px] sm:text-[6px] px-1 py-0.1 rounded mt-0.5 uppercase tracking-wider scale-80 sm:scale-90 ${badge.style}`}>
-                            {badge.text.replace('👑 ', '').replace('⚡ ', '').replace('🌟 ', '')}
-                          </span>
-                        );
-                      })()}
-                    </div>
-                  );
-                })}
-              </div>
+                  const row1 = sortedPlayersForPitch.slice(0, 1);
+                  const row2 = sortedPlayersForPitch.slice(1, 4);
+                  const row3 = sortedPlayersForPitch.slice(4, 7);
+                  const row4 = sortedPlayersForPitch.slice(7, 11);
 
-              {/* Row 4: Bowlers */}
-              <div className="flex justify-center gap-2 sm:gap-6">
-                {tournamentDreamTeam.players.filter(p => p.role === 'Bawler').map(player => {
-                  const isTopOverall = player.id === topPerformancePlayerId;
-                  return (
-                    <div key={player.id} className="flex flex-col items-center relative">
-                      <div className="relative">
-                        {isTopOverall && (
-                          <>
-                            <div className="absolute -top-2.5 sm:-top-3.5 left-1/2 -translate-x-1/2 text-[9px] sm:text-[11px] animate-bounce z-30 filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">👑</div>
-                            <div className="absolute inset-0 rounded-full bg-amber-500/25 animate-ping pointer-events-none" />
-                          </>
-                        )}
-                        {player.photo ? (
-                          <img
-                            src={getFileUrl('players', player.id, player.photo)}
-                            alt=""
-                            className={`w-7 h-7 sm:w-8.5 sm:h-8.5 rounded-full object-cover shadow-md transition-all ${
-                              isTopOverall
-                                ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-955 shadow-[0_0_15px_rgba(245,158,11,0.85)] border-amber-450'
-                                : isFinalCompleted
-                                ? 'ring-1 ring-amber-500/40 ring-offset-1 ring-offset-slate-900 border-amber-500/30'
-                                : 'border border-emerald-450/70'
-                            }`}
-                          />
-                        ) : (
-                          <div className={`w-7 h-7 sm:w-8.5 sm:h-8.5 rounded-full bg-gradient-to-br border flex items-center justify-center text-[7px] sm:text-[9px] font-black uppercase shadow-md transition-all ${
-                            isTopOverall
-                              ? 'from-amber-400 to-yellow-500 border-amber-305 ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-955 shadow-[0_0_15px_rgba(245,158,11,0.85)] text-slate-955'
-                              : isFinalCompleted
-                              ? 'from-amber-600/40 to-yellow-750/30 border-amber-500/35 text-amber-200'
-                              : 'from-emerald-500 to-teal-650 border-emerald-555 text-white'
-                          }`}>
-                            {player.name.substring(0, 2)}
-                          </div>
-                        )}
-                        {player.id === tournamentDreamTeam.captainId && (
-                          <span className="absolute -top-1 sm:-top-1.5 -right-1 sm:-right-1.5 bg-amber-500 text-slate-955 text-[5.5px] sm:text-[7.5px] font-black w-3 h-3 sm:w-4 sm:h-4 rounded-full flex items-center justify-center border border-slate-950 shadow-md">C</span>
-                        )}
-                        {player.id === tournamentDreamTeam.viceCaptainId && (
-                          <span className="absolute -top-1 sm:-top-1.5 -right-1 sm:-right-1.5 bg-slate-355 text-slate-955 text-[5.5px] sm:text-[7.5px] font-black w-3 h-3 sm:w-4 sm:h-4 rounded-full flex items-center justify-center border border-slate-950 shadow-md">VC</span>
-                        )}
-                      </div>
-                      <span className={`text-[7px] sm:text-[8.5px] font-extrabold mt-1 px-1 sm:px-2 py-0.1 sm:py-0.5 rounded-full shadow-sm truncate max-w-[65px] sm:max-w-[80px] transition-all ${
-                        isTopOverall
-                          ? 'text-amber-300 bg-amber-955/95 border border-amber-400 font-black scale-105 shadow-[0_2px_6px_rgba(245,158,11,0.3)]'
-                          : isFinalCompleted
-                          ? 'text-amber-200 bg-amber-955/80 border border-amber-500/30'
-                          : 'text-slate-100 bg-slate-950/80 border border-slate-850'
-                      }`}>
-                        {player.name.split(' (')[0]}
-                      </span>
-                      <span className={`text-[6px] sm:text-[7px] font-bold bg-slate-950/85 px-1 sm:px-1.5 rounded-md mt-0.5 opacity-90 border transition-all ${
-                        isTopOverall
-                          ? 'text-amber-400 border-amber-500/40'
-                          : isFinalCompleted
-                          ? 'text-amber-300/85 border-amber-500/20'
-                          : 'text-emerald-450 border-slate-900'
-                      }`}>
-                        {player.points} pts • {selectionMap[player.id]}%
-                      </span>
-                      {(() => {
-                        const badge = getPlayerHighlightBadge(player.id);
-                        if (!badge) return null;
+                  return [row1, row2, row3, row4].map((rowPlayers, rowIndex) => (
+                    <div key={rowIndex} className="flex justify-center gap-1.5 sm:gap-6">
+                      {rowPlayers.map(player => {
+                        const isTopOverall = player.id === topPerformancePlayerId;
                         return (
-                          <span className={`inline-block text-[5px] sm:text-[6px] px-1 py-0.1 rounded mt-0.5 uppercase tracking-wider scale-80 sm:scale-90 ${badge.style}`}>
-                            {badge.text.replace('👑 ', '').replace('⚡ ', '').replace('🌟 ', '')}
-                          </span>
+                          <div key={player.id} className="flex flex-col items-center relative w-[54px] sm:w-20 shrink-0">
+                            <div className="relative">
+                              {isTopOverall && (
+                                <>
+                                  <div className="absolute -top-2.5 sm:-top-3.5 left-1/2 -translate-x-1/2 text-[9px] sm:text-[11px] animate-bounce z-30 filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">👑</div>
+                                  <div className="absolute inset-0 rounded-full bg-amber-500/25 animate-ping pointer-events-none" />
+                                </>
+                              )}
+                              {player.photo ? (
+                                <img
+                                  src={getFileUrl('players', player.id, player.photo)}
+                                  alt=""
+                                  className={`w-7 h-7 sm:w-8.5 sm:h-8.5 rounded-full object-cover shadow-md transition-all ${
+                                    isTopOverall
+                                      ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-955 shadow-[0_0_15px_rgba(245,158,11,0.85)] border-amber-450'
+                                      : isFinalCompleted
+                                      ? 'ring-1 ring-amber-500/40 ring-offset-1 ring-offset-slate-900 border-amber-500/30'
+                                      : 'border border-emerald-450/70'
+                                  }`}
+                                />
+                              ) : (
+                                <div className={`w-7 h-7 sm:w-8.5 sm:h-8.5 rounded-full bg-gradient-to-br border flex items-center justify-center text-[7px] sm:text-[9px] font-black uppercase shadow-md transition-all ${
+                                  isTopOverall
+                                    ? 'from-amber-400 to-yellow-500 border-amber-305 ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-955 shadow-[0_0_15px_rgba(245,158,11,0.85)] text-slate-955'
+                                    : isFinalCompleted
+                                    ? 'from-amber-600/40 to-yellow-750/30 border-amber-505 text-amber-200'
+                                    : 'from-emerald-500 to-teal-650 border-emerald-555 text-white'
+                                }`}>
+                                  {player.name.substring(0, 2)}
+                                </div>
+                              )}
+                              {player.id === tournamentDreamTeam.captainId && (
+                                <span className="absolute -top-1 sm:-top-1.5 -right-1 sm:-right-1.5 bg-amber-500 text-slate-955 text-[5.5px] sm:text-[7.5px] font-black w-3 h-3 sm:w-4 sm:h-4 rounded-full flex items-center justify-center border border-slate-955 shadow-md">C</span>
+                              )}
+                              {player.id === tournamentDreamTeam.viceCaptainId && (
+                                <span className="absolute -top-1 sm:-top-1.5 -right-1 sm:-right-1.5 bg-slate-350 text-slate-955 text-[5.5px] sm:text-[7.5px] font-black w-3 h-3 sm:w-4 sm:h-4 rounded-full flex items-center justify-center border border-slate-955 shadow-md">VC</span>
+                              )}
+                            </div>
+                            <span className={`text-[7px] sm:text-[8.5px] font-extrabold mt-1 px-1 sm:px-2 py-0.1 sm:py-0.5 rounded-full shadow-sm truncate max-w-[50px] sm:max-w-[80px] transition-all ${
+                              isTopOverall
+                                ? 'text-amber-300 bg-amber-955/95 border border-amber-400 font-black scale-105 shadow-[0_2px_6px_rgba(245,158,11,0.3)]'
+                                : isFinalCompleted
+                                ? 'text-amber-200 bg-amber-955/80 border border-amber-500/30'
+                                : 'text-slate-100 bg-slate-950/80 border border-slate-850'
+                            }`}>
+                              {player.name.split(' (')[0]}
+                            </span>
+                            <span className={`text-[6px] sm:text-[7px] font-bold bg-slate-950/85 px-1 sm:px-1.5 rounded-md mt-0.5 opacity-90 border transition-all ${
+                              isTopOverall
+                                ? 'text-amber-400 border-amber-500/40'
+                                : isFinalCompleted
+                                ? 'text-amber-300/85 border-amber-500/20'
+                                : 'text-emerald-450 border-slate-900'
+                            }`}>
+                              {player.points} pts • {selectionMap[player.id]}%
+                            </span>
+                            {(() => {
+                              const badge = getPlayerHighlightBadge(player.id);
+                              if (!badge) return null;
+                              return (
+                                <span className={`inline-block text-[5px] sm:text-[6px] px-1 py-0.1 rounded mt-0.5 uppercase tracking-wider scale-80 sm:scale-90 ${badge.style}`}>
+                                  {badge.text.replace('👑 ', '').replace('⚡ ', '').replace('🌟 ', '')}
+                                </span>
+                              );
+                            })()}
+                          </div>
                         );
-                      })()}
+                      })}
                     </div>
-                  );
-                })}
+                  ));
+                })()}
               </div>
-
             </div>
-          </div>
+          ) : (
+            /* List View */
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
+              {(['Wicket Keeper', 'Batter', 'All-Rounder', 'Bawler'] as const).map((role) => {
+                const rolePlayers = tournamentDreamTeam.players.filter(p => p.role === role);
+                if (rolePlayers.length === 0) return null;
+                
+                return (
+                  <div key={role} className="space-y-2 bg-slate-950/20 p-3 rounded-2xl border border-slate-900/60">
+                    <div className="flex items-center justify-between border-b border-slate-905 pb-1.5 mb-2">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        {role === 'Bawler' ? 'Bowlers' : role + 's'}
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-500">
+                        {rolePlayers.length} {rolePlayers.length === 1 ? 'Player' : 'Players'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
+                      {rolePlayers.map((player) => {
+                        const isTopOverall = player.id === topPerformancePlayerId;
+                        const badge = getPlayerHighlightBadge(player.id);
+                        const playerTeam = teams.find(t => t.id === player.team);
+                        return (
+                          <div
+                            key={player.id}
+                            className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${
+                              isTopOverall
+                                ? 'bg-amber-955/10 border-amber-500/40 shadow-[inset_0_0_12px_rgba(245,158,11,0.05)]'
+                                : 'bg-slate-900/45 border-slate-850/60 hover:border-slate-800'
+                            }`}
+                          >
+                            {/* Photo / initials */}
+                            <div className="relative shrink-0">
+                              {player.photo ? (
+                                <img
+                                  src={getFileUrl('players', player.id, player.photo)}
+                                  alt=""
+                                  className={`w-9 h-9 rounded-full object-cover border ${
+                                    isTopOverall ? 'border-amber-400 ring-1 ring-amber-400/40' : 'border-slate-800'
+                                  }`}
+                                />
+                              ) : (
+                                <div className={`w-9 h-9 rounded-full border flex items-center justify-center text-xs font-black uppercase ${
+                                  isTopOverall ? 'bg-gradient-to-br from-amber-400 to-yellow-500 border-amber-305 text-slate-955' : 'bg-slate-800 border-slate-700 text-slate-350'
+                                }`}>
+                                  {player.name.substring(0, 2)}
+                                </div>
+                              )}
+                              {player.id === tournamentDreamTeam.captainId && (
+                                <span className="absolute -top-1 -right-1 bg-amber-500 text-slate-955 text-[8px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center border border-slate-950 shadow">C</span>
+                              )}
+                              {player.id === tournamentDreamTeam.viceCaptainId && (
+                                <span className="absolute -top-1 -right-1 bg-slate-300 text-slate-955 text-[8px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center border border-slate-950 shadow">VC</span>
+                              )}
+                            </div>
+                            
+                            {/* Player Info */}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`text-[11px] font-extrabold truncate ${isTopOverall ? 'text-amber-300' : 'text-slate-200'}`}>
+                                  {player.name.split(' (')[0]}
+                                </span>
+                                {isTopOverall && <span className="text-[10px] shrink-0">👑</span>}
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5 text-[9px] text-slate-500 font-bold">
+                                <span>{playerTeam?.short_name || 'Team'}</span>
+                                <span>•</span>
+                                <span className="text-emerald-450">{player.points} pts</span>
+                              </div>
+                              {badge && (
+                                <span className={`inline-block text-[7px] px-1.5 py-0.2 rounded mt-1 uppercase tracking-wider font-extrabold scale-90 origin-left ${badge.style}`}>
+                                  {badge.text.replace('👑 ', '').replace('⚡ ', '').replace('🌟 ', '')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
