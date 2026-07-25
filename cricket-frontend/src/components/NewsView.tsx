@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { pb, type News } from '../services/pocketbase';
 import { Calendar, Download, ChevronLeft, ChevronRight, Newspaper } from 'lucide-react';
 
@@ -34,6 +34,14 @@ export const NewsView: React.FC<NewsViewProps> = ({ newsList }) => {
     const [startX, setStartX] = useState<number | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const photos = newsItem.photos || [];
+
+    useEffect(() => {
+      if (photos.length <= 1) return;
+      const timer = setInterval(() => {
+        setCurrentIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1));
+      }, 5000);
+      return () => clearInterval(timer);
+    }, [photos.length]);
 
     if (photos.length === 0) return null;
 

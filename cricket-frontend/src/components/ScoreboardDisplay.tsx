@@ -3,6 +3,7 @@ import { pb, getTeamLogo, getFileUrl } from '../services/pocketbase';
 import type { Match, Team, Player, Inning, Delivery, TournamentConfig, MatchVote } from '../services/pocketbase';
 import { Activity, Loader2, Trophy } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { parseStage } from '../services/bracketUtils';
 
 interface ScoreboardDisplayProps {
   matches: Match[];
@@ -32,6 +33,30 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
   const finalMatch = matches.find(m => m.stage === 'Final');
   const isTournamentEnded = finalMatch?.status === 'Completed';
   const championTeam = finalMatch ? teams.find(t => t.id === finalMatch.winner) : null;
+
+  const phaseSetting = tournamentConfig?.stats_from_phase || 'All';
+
+  // Filter deliveries by tournament phase setting for accolade calculations
+  const filteredDeliveries = React.useMemo(() => {
+    if (phaseSetting === 'All') return allDeliveries;
+
+    const inningMap = new Map(allInnings.map(i => [i.id, i.match]));
+
+    return allDeliveries.filter(d => {
+      const matchId = inningMap.get(d.inning);
+      const match = matches.find(m => m.id === matchId);
+      if (!match) return true;
+
+      const parsed = parseStage(match.stage);
+      if (phaseSetting === 'Quarter Finals') {
+        return parsed.round <= 3; // QF, SF, Final
+      }
+      if (phaseSetting === 'Semi Finals') {
+        return parsed.round <= 2; // SF, Final
+      }
+      return true;
+    });
+  }, [allDeliveries, allInnings, phaseSetting, matches]);
 
   const fetchDisplayData = async () => {
     try {
@@ -83,7 +108,7 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
         if (inningDeliveries.length > 0) {
           const lastDel = inningDeliveries[inningDeliveries.length - 1];
           if (prevDeliveryId && lastDel.id !== prevDeliveryId) {
-            if (lastDel.is_wicket) {
+            if (lastDel.is_wicket && lastDel.dismissal_type !== 'Retired Out') {
               setShowHighlight('Wicket');
             } else if (lastDel.runs_off_bat === 4) {
               setShowHighlight('Four');
@@ -216,9 +241,10 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
       
       const isSpecialExtras = liveMatch.special_extras || false;
       const legalBalls = bowlerDeliveries.filter(d => {
+        if (d.dismissal_type === 'Retired Out') return false;
         const isWide = d.extra_type === 'Wide';
         const isNoBall = d.extra_type === 'No Ball';
-        return isSpecialExtras ? true : (!isWide && !isNoBall);
+        return isSpecialExtras ? (d.ball_number > 0) : (!isWide && !isNoBall);
       }).length;
 
       const oversStr = `${Math.floor(legalBalls / 6)}.${legalBalls % 6}`;
@@ -263,9 +289,10 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
 
     // Active Inning legal balls count
     const activeLegalBalls = inningDeliveries.filter(d => {
+      if (d.dismissal_type === 'Retired Out') return false;
       const isWide = d.extra_type === 'Wide';
       const isNoBall = d.extra_type === 'No Ball';
-      return liveMatch.special_extras ? true : (!isWide && !isNoBall);
+      return liveMatch.special_extras ? (d.ball_number > 0) : (!isWide && !isNoBall);
     }).length;
 
     const activeOversStr = `${Math.floor(activeLegalBalls / 6)}.${activeLegalBalls % 6}`;
@@ -498,9 +525,9 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
           </div>
 
           {/* Large Scoring Center */}
-          <div className="my-1 flex flex-col items-center justify-center text-center">
+          <div className="my-3 flex flex-col items-center justify-center text-center">
             <div className="flex items-baseline gap-2">
-              <span className="text-6xl sm:text-7xl font-black text-white tracking-tighter drop-shadow-md flex items-center overflow-hidden h-[60px] sm:h-[72px]">
+              <span className="text-7xl sm:text-8xl font-black text-emerald-400 tracking-tighter drop-shadow-xl flex items-center overflow-hidden h-[75px] sm:h-[90px]">
                 <AnimatePresence mode="popLayout" initial={false}>
                   <motion.span
                     key={activeInningRuns}
@@ -513,8 +540,8 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
                   </motion.span>
                 </AnimatePresence>
               </span>
-              <span className="text-4xl sm:text-5xl font-black text-slate-650">/</span>
-              <span className="text-4xl sm:text-5xl font-black text-emerald-400 drop-shadow-md flex items-center overflow-hidden h-[40px] sm:h-[48px]">
+              <span className="text-5xl sm:text-6xl font-black text-slate-700">/</span>
+              <span className="text-5xl sm:text-6xl font-black text-white drop-shadow-md flex items-center overflow-hidden h-[50px] sm:h-[60px]">
                 <AnimatePresence mode="popLayout" initial={false}>
                   <motion.span
                     key={activeInningWickets}
@@ -528,7 +555,7 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
                 </AnimatePresence>
               </span>
             </div>
-            <div className="text-base sm:text-lg font-bold text-slate-400 mt-0.5 flex items-center justify-center gap-1 overflow-hidden h-6">
+            <div className="text-xl sm:text-2xl font-black text-amber-400 mt-1 flex items-center justify-center gap-1.5 overflow-hidden h-8">
               <AnimatePresence mode="popLayout" initial={false}>
                 <motion.span
                   key={activeOversStr}
@@ -540,7 +567,7 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
                   {activeOversStr}
                 </motion.span>
               </AnimatePresence>
-              <span className="text-xs text-slate-500">Overs</span>
+              <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">Overs</span>
             </div>
           </div>
 
@@ -574,20 +601,20 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
           )}
 
           {/* Target / Inning summary info */}
-          <div className="bg-slate-900/50 border border-slate-800/80 p-2.5 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-2">
+          <div className="bg-slate-900/60 border border-slate-800 p-3 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-2">
             {isSecondInning ? (
               <>
                 <div className="space-y-0.5 text-center sm:text-left">
                   <span className="text-xs text-slate-400 block font-extrabold uppercase tracking-wider">
-                    {isSuperOver ? 'SO Target:' : 'Target:'} <span className="text-amber-400 font-black text-sm sm:text-base">{target} Runs</span>
+                    {isSuperOver ? 'SO Target:' : 'Target:'} <span className="text-amber-400 font-black text-base sm:text-lg">{target} Runs</span>
                   </span>
                   <span className="text-xs sm:text-sm text-slate-200 block font-bold">
                     Opponent <span className="text-emerald-400 font-black">{bowlingTeam?.short_name || 'Opponent'}</span> scored <span className="text-amber-400 font-black text-sm sm:text-base">{firstInningRuns} runs</span>
                   </span>
                 </div>
-                <div className="bg-slate-950 px-3 py-1.5 rounded-lg text-center border border-slate-850 shrink-0">
+                <div className="bg-slate-950 px-3.5 py-2 rounded-xl text-center border border-slate-800 shrink-0">
                   <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest block">Requirement</span>
-                  <span className="text-xs sm:text-sm font-black text-emerald-400">
+                  <span className="text-sm sm:text-base font-black text-emerald-400">
                     Need {runsNeeded} Runs off {ballsRemaining} Balls
                   </span>
                 </div>
@@ -599,11 +626,11 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
                     ? `Super Over ${Math.floor((matchInnings.length - 1) / 2) + 1} - Inn 01` 
                     : 'First Inning'}
                 </span>
-                <span className="text-xs sm:text-sm text-slate-200 block font-bold">
+                <span className="text-sm text-slate-200 block font-bold">
                   Setting Target for <span className="text-emerald-400 font-black">{bowlingTeam?.short_name || 'Opponent'}</span>
                 </span>
-                <span className="text-[10px] text-slate-500 block">
-                  Projected Score: <span className="text-amber-400 font-black">{activeLegalBalls > 0 ? Math.round((activeInningRuns / activeLegalBalls) * totalBallsLimit) : 0}</span> runs (at current RR)
+                <span className="text-xs text-slate-400 block font-semibold">
+                  Projected Score: <span className="text-amber-400 font-black text-sm sm:text-base">{activeLegalBalls > 0 ? Math.round((activeInningRuns / activeLegalBalls) * totalBallsLimit) : 0}</span> runs (at current RR)
                 </span>
               </div>
             )}
@@ -618,46 +645,46 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
             <h4 className="text-[10px] text-slate-500 font-black uppercase tracking-wider border-b border-slate-900 pb-2">Active Batsmen</h4>
             
             {/* Striker */}
-            <div className={`p-3 rounded-2xl border ${striker ? 'bg-slate-900/80 border-slate-800/80' : 'bg-slate-950/30 border-slate-900/50'} flex justify-between items-center`}>
-              <div className="flex items-center gap-2">
-                <span className="text-lg">🏏</span>
+            <div className={`p-3.5 rounded-2xl border ${striker ? 'bg-slate-900/90 border-slate-750 shadow-md' : 'bg-slate-950/30 border-slate-900/50'} flex justify-between items-center`}>
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">🏏</span>
                 <div>
-                  <span className="text-xs font-bold text-slate-200 block">
+                  <span className="text-sm sm:text-base font-extrabold text-white block">
                     {striker ? striker.name : 'Waiting...'}
                   </span>
-                  <span className="text-[9px] text-slate-500 font-medium">Striker</span>
+                  <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Striker</span>
                 </div>
               </div>
               {strikerStats && (
                 <div className="text-right">
-                  <span className="text-lg font-black text-slate-100 block">
-                    {strikerStats.runs} <span className="text-xs font-semibold text-slate-450">({strikerStats.balls})</span>
+                  <span className="text-xl sm:text-2xl font-black text-emerald-400 block">
+                    {strikerStats.runs} <span className="text-xs font-bold text-slate-400">({strikerStats.balls})</span>
                   </span>
-                  <span className="text-[9px] text-slate-500 block">
-                    {strikerStats.fours}x4 / {strikerStats.sixes}x6
+                  <span className="text-[10px] text-slate-400 font-semibold block">
+                    {strikerStats.fours}x4 / {strikerStats.sixes}x6 <span className="text-amber-400 font-bold ml-1">SR: {strikerStats.balls > 0 ? ((strikerStats.runs / strikerStats.balls) * 100).toFixed(1) : '0.0'}</span>
                   </span>
                 </div>
               )}
             </div>
 
             {/* Non-Striker */}
-            <div className={`p-3 rounded-2xl border ${nonStriker ? 'bg-slate-905/60 border-slate-850' : 'bg-slate-950/30 border-slate-900/50'} flex justify-between items-center`}>
-              <div className="flex items-center gap-2">
-                <span className="text-lg text-slate-600">👤</span>
+            <div className={`p-3.5 rounded-2xl border ${nonStriker ? 'bg-slate-900/60 border-slate-800/80' : 'bg-slate-950/30 border-slate-900/50'} flex justify-between items-center`}>
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl text-slate-500">👤</span>
                 <div>
-                  <span className="text-xs font-semibold text-slate-400 block">
+                  <span className="text-xs sm:text-sm font-bold text-slate-200 block">
                     {nonStriker ? nonStriker.name : 'Waiting...'}
                   </span>
-                  <span className="text-[9px] text-slate-550 font-medium">Non-Striker</span>
+                  <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Non-Striker</span>
                 </div>
               </div>
               {nonStrikerStats && (
                 <div className="text-right">
-                  <span className="text-base font-bold text-slate-350 block">
-                    {nonStrikerStats.runs} <span className="text-xs font-medium text-slate-500">({nonStrikerStats.balls})</span>
+                  <span className="text-lg sm:text-xl font-extrabold text-slate-200 block">
+                    {nonStrikerStats.runs} <span className="text-xs font-semibold text-slate-400">({nonStrikerStats.balls})</span>
                   </span>
-                  <span className="text-[9px] text-slate-600 block">
-                    {nonStrikerStats.fours}x4 / {nonStrikerStats.sixes}x6
+                  <span className="text-[10px] text-slate-500 font-medium block">
+                    {nonStrikerStats.fours}x4 / {nonStrikerStats.sixes}x6 <span className="text-slate-400 font-bold ml-1">SR: {nonStrikerStats.balls > 0 ? ((nonStrikerStats.runs / nonStrikerStats.balls) * 100).toFixed(1) : '0.0'}</span>
                   </span>
                 </div>
               )}
@@ -667,22 +694,22 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
           {/* Bowler Display */}
           <div className="space-y-4 my-4">
             <h4 className="text-[10px] text-slate-500 font-black uppercase tracking-wider border-b border-slate-900 pb-2">Active Bowler</h4>
-            <div className={`p-3 rounded-2xl border ${bowler ? 'bg-slate-900/80 border-slate-800/80' : 'bg-slate-950/30 border-slate-900/50'} flex justify-between items-center`}>
-              <div className="flex items-center gap-2">
-                <span className="text-lg">🥎</span>
+            <div className={`p-3.5 rounded-2xl border ${bowler ? 'bg-slate-900/90 border-slate-750 shadow-md' : 'bg-slate-950/30 border-slate-900/50'} flex justify-between items-center`}>
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">🥎</span>
                 <div>
-                  <span className="text-xs font-bold text-slate-200 block">
+                  <span className="text-sm sm:text-base font-extrabold text-white block">
                     {bowler ? bowler.name : 'Waiting...'}
                   </span>
-                  <span className="text-[9px] text-slate-500 font-medium">{bowlingTeam?.name}</span>
+                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">{bowlingTeam?.name}</span>
                 </div>
               </div>
               {bowlerStats && (
                 <div className="text-right">
-                  <span className="text-lg font-black text-slate-100 block">
-                    {bowlerStats.wickets} <span className="text-xs font-semibold text-slate-450">wkt</span>
+                  <span className="text-xl sm:text-2xl font-black text-amber-400 block">
+                    {bowlerStats.wickets} <span className="text-xs font-bold text-slate-400">wkt</span>
                   </span>
-                  <span className="text-[9px] text-slate-550 block">
+                  <span className="text-[10px] text-slate-400 font-semibold block">
                     {bowlerStats.overs} ov / {bowlerStats.runs} runs
                   </span>
                 </div>
@@ -703,13 +730,13 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
             {renderRecentBalls()}
             
             <div className="grid grid-cols-2 gap-2 text-center pt-2">
-              <div className="bg-slate-950/80 border border-slate-850 p-2 rounded-xl">
+              <div className="bg-slate-950/90 border border-slate-800 p-2.5 rounded-xl">
                 <span className="text-[9px] text-slate-500 font-black block uppercase tracking-wider">Current RR</span>
-                <span className="text-sm font-black text-slate-200">{crr}</span>
+                <span className="text-base sm:text-lg font-black text-white">{crr}</span>
               </div>
-              <div className="bg-slate-950/80 border border-slate-850 p-2 rounded-xl">
+              <div className="bg-slate-950/90 border border-slate-800 p-2.5 rounded-xl">
                 <span className="text-[9px] text-slate-500 font-black block uppercase tracking-wider">Required RR</span>
-                <span className="text-sm font-black text-emerald-400">{isSecondInning ? rrr : 'N/A'}</span>
+                <span className="text-base sm:text-lg font-black text-emerald-400">{isSecondInning ? rrr : 'N/A'}</span>
               </div>
             </div>
           </div>
@@ -727,7 +754,7 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
     const wicketsMap: Record<string, number> = {};
     const fieldingMap: Record<string, number> = {};
 
-    allDeliveries.forEach((d) => {
+    filteredDeliveries.forEach((d) => {
       const deliveryInning = allInnings.find(i => i.id === d.inning);
       const deliveryMatch = deliveryInning ? matches.find(m => m.id === deliveryInning.match) : null;
       const isSpecialExtras = deliveryMatch?.special_extras || false;

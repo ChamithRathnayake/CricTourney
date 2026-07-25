@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { pb, getTeamLogo, getFileUrl } from '../services/pocketbase';
 import type { Player, Team, Delivery, Match, FantasyTeam, TournamentConfig } from '../services/pocketbase';
 import { Trophy, Users, Sparkles, Trash2, Save, Search, Info, ShieldAlert, BadgeInfo, LayoutGrid, List } from 'lucide-react';
+import { parseStage } from '../services/bracketUtils';
 
 interface FantasyLeagueProps {
   players: Player[];
@@ -86,6 +87,7 @@ const getBrowserFingerprint = () => {
 export const FantasyLeague: React.FC<FantasyLeagueProps> = ({ players, teams, matches, isConnected, tournamentConfig }) => {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [fantasyTeams, setFantasyTeams] = useState<FantasyTeam[]>([]);
+  const [innings, setInnings] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('All');
 
@@ -102,17 +104,18 @@ export const FantasyLeague: React.FC<FantasyLeagueProps> = ({ players, teams, ma
 
   const fetchData = async () => {
     try {
-      const deliveryRecords = await pb.collection('deliveries').getFullList<Delivery>({
-        requestKey: null
-      });
+      const [deliveryRecords, fTeamRecords, inningRecords] = await Promise.all([
+        pb.collection('deliveries').getFullList<Delivery>({ requestKey: null }),
+        pb.collection('fantasy_teams').getFullList<FantasyTeam>({
+          expand: 'players,players.team,captain,vice_captain',
+          sort: '-created',
+          requestKey: null
+        }),
+        pb.collection('innings').getFullList({ requestKey: null })
+      ]);
       setDeliveries(deliveryRecords);
-
-      const fTeamRecords = await pb.collection('fantasy_teams').getFullList<FantasyTeam>({
-        expand: 'players,players.team,captain,vice_captain',
-        sort: '-created',
-        requestKey: null
-      });
       setFantasyTeams(fTeamRecords);
+      setInnings(inningRecords);
     } catch (err) {
       console.error('Error fetching fantasy data:', err);
     }
@@ -170,14 +173,38 @@ export const FantasyLeague: React.FC<FantasyLeagueProps> = ({ players, teams, ma
   const isFinalCompleted = matches.some(m => m.stage === 'Final' && m.status === 'Completed');
   const isSquadLocked = isMatchLive || isFinalStarted;
 
+  const phaseSetting = tournamentConfig?.stats_from_phase || 'All';
+
+  // Filter deliveries by tournament phase setting
+  const filteredDeliveries = React.useMemo(() => {
+    if (phaseSetting === 'All') return deliveries;
+
+    const inningMap = new Map(innings.map(i => [i.id, i.match]));
+
+    return deliveries.filter(d => {
+      const matchId = inningMap.get(d.inning);
+      const match = matches.find(m => m.id === matchId);
+      if (!match) return true;
+
+      const parsed = parseStage(match.stage);
+      if (phaseSetting === 'Quarter Finals') {
+        return parsed.round <= 3; // QF, SF, Final
+      }
+      if (phaseSetting === 'Semi Finals') {
+        return parsed.round <= 2; // SF, Final
+      }
+      return true;
+    });
+  }, [deliveries, innings, phaseSetting, matches]);
+
   // 2. Compute Player points map
   const playerPointsMap = React.useMemo(() => {
     const map: Record<string, number> = {};
     players.forEach(p => {
-      map[p.id] = calculatePlayerFantasyPoints(p.id, deliveries);
+      map[p.id] = calculatePlayerFantasyPoints(p.id, filteredDeliveries);
     });
     return map;
-  }, [players, deliveries]);
+  }, [players, filteredDeliveries]);
 
   // Compute Selection % popularity map based on all fan teams
   const selectionMap = React.useMemo(() => {
@@ -202,12 +229,26 @@ export const FantasyLeague: React.FC<FantasyLeagueProps> = ({ players, teams, ma
     return percentMap;
   }, [players, fantasyTeams]);
 
-  // 3. Compute Fantasy Team Leaderboard (applying C = 2.0x, VC = 1.5x)
+  const getScopedDeliveriesForTeam = (teamCreatedStr?: string) => {
+    if (!teamCreatedStr) return filteredDeliveries;
+    const teamCreatedTime = new Date(teamCreatedStr).getTime();
+    if (isNaN(teamCreatedTime)) return filteredDeliveries;
+
+    return filteredDeliveries.filter(d => {
+      if (!d.created) return true;
+      const deliveryTime = new Date(d.created).getTime();
+      return isNaN(deliveryTime) || deliveryTime >= (teamCreatedTime - 600000); // 10 min grace period
+    });
+  };
+
+  // 3. Compute Fantasy Team Leaderboard (applying C = 2.0x, VC = 1.5x, and Scoped Deliveries)
   const leaderboard = React.useMemo(() => {
     return fantasyTeams.map(t => {
       const squad = t.players || [];
+      const scopedDels = getScopedDeliveriesForTeam(t.created);
+
       const totalPoints = squad.reduce((sum, pId) => {
-        let pts = playerPointsMap[pId] || 0;
+        let pts = calculatePlayerFantasyPoints(pId, scopedDels);
         if (pId === t.captain) {
           pts *= 2.0;
         } else if (pId === t.vice_captain) {
@@ -217,10 +258,10 @@ export const FantasyLeague: React.FC<FantasyLeagueProps> = ({ players, teams, ma
       }, 0);
       return {
         ...t,
-        totalPoints
+        totalPoints: Math.round(totalPoints * 10) / 10
       };
     }).sort((a, b) => b.totalPoints - a.totalPoints);
-  }, [fantasyTeams, playerPointsMap]);
+  }, [fantasyTeams, players, filteredDeliveries]);
 
   // Find user's rank
   const myRank = leaderboard.findIndex(t => t.id === myTeamId) + 1;
@@ -555,6 +596,14 @@ export const FantasyLeague: React.FC<FantasyLeagueProps> = ({ players, teams, ma
             <p className="text-sm text-slate-400 leading-relaxed">
               Create your dream team of **11 players** from the participating rosters. Nominate a **Captain (2x points)** and **Vice-Captain (1.5x points)**. Earn points for boundaries, wickets, catches, dot balls, and milestones in every live match.
             </p>
+            {phaseSetting !== 'All' && (
+              <div className="mt-3 p-2.5 bg-amber-500/10 border border-amber-500/25 rounded-xl flex items-center gap-2 text-xs text-amber-300">
+                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  <strong>Phase Filter Active:</strong> Fantasy points calculated from <strong>{phaseSetting} Onwards</strong>.
+                </span>
+              </div>
+            )}
           </div>
           {myTeamId && leaderboard.length > 0 && (
             <div className="bg-slate-950/80 border border-slate-850 p-5 rounded-2xl shrink-0 flex items-center gap-4 text-center sm:text-left shadow-lg">

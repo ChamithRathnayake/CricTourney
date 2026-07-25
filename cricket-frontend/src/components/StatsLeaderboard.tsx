@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { pb, getFileUrl, getTeamLogo } from '../services/pocketbase';
 import type { Player, Team, Delivery, Match, TournamentConfig } from '../services/pocketbase';
-import { Award, Flame, Sparkles, Crown } from 'lucide-react';
+import { Award, Flame, Sparkles, Crown, BarChart3, Activity, Layers } from 'lucide-react';
+import { parseStage } from '../services/bracketUtils';
 
 interface StatsLeaderboardProps {
   players: Player[];
@@ -42,8 +43,34 @@ interface PlayerStats {
 
 export const StatsLeaderboard: React.FC<StatsLeaderboardProps> = ({ players, teams, matches, tournamentConfig }) => {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [innings, setInnings] = useState<any[]>([]);
   const [playerStats, setPlayerStats] = useState<Record<string, PlayerStats>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [activeSubTab, setActiveSubTab] = useState<'caps' | 'analytics'>('caps');
+
+  const phaseSetting = tournamentConfig?.stats_from_phase || 'All';
+
+  // Filter deliveries by tournament phase setting
+  const filteredDeliveries = React.useMemo(() => {
+    if (phaseSetting === 'All') return deliveries;
+
+    const inningMap = new Map(innings.map(i => [i.id, i.match]));
+
+    return deliveries.filter(d => {
+      const matchId = inningMap.get(d.inning);
+      const match = matches.find(m => m.id === matchId);
+      if (!match) return true;
+
+      const parsed = parseStage(match.stage);
+      if (phaseSetting === 'Quarter Finals') {
+        return parsed.round <= 3; // QF, SF, Final
+      }
+      if (phaseSetting === 'Semi Finals') {
+        return parsed.round <= 2; // SF, Final
+      }
+      return true;
+    });
+  }, [deliveries, innings, phaseSetting, matches]);
 
   const formatPlayerName = (player: Player) => {
     if (tournamentConfig?.show_epf_number && player.epf_number) {
@@ -54,14 +81,18 @@ export const StatsLeaderboard: React.FC<StatsLeaderboardProps> = ({ players, tea
 
   const isTournamentEnded = matches.find(m => m.stage === 'Final')?.status === 'Completed';
 
-  // Fetch all deliveries to calculate stats
+  // Fetch all deliveries & innings to calculate stats
   const fetchDeliveries = async () => {
     try {
       setIsLoading(true);
-      const records = await pb.collection('deliveries').getFullList<Delivery>({
-        expand: 'striker,bawler,fielder,striker.team,bawler.team'
-      });
-      setDeliveries(records);
+      const [delRecords, innRecords] = await Promise.all([
+        pb.collection('deliveries').getFullList<Delivery>({
+          expand: 'striker,bawler,fielder,striker.team,bawler.team'
+        }),
+        pb.collection('innings').getFullList()
+      ]);
+      setDeliveries(delRecords);
+      setInnings(innRecords);
     } catch (err) {
       console.error('Error fetching deliveries for stats:', err);
     } finally {
@@ -84,7 +115,7 @@ export const StatsLeaderboard: React.FC<StatsLeaderboardProps> = ({ players, tea
 
   // Compute all player batting and bowling tournament statistics
   useEffect(() => {
-    if (deliveries.length === 0 || players.length === 0) return;
+    if (filteredDeliveries.length === 0 || players.length === 0) return;
 
     const statsMap: Record<string, {
       batting: {
@@ -112,16 +143,17 @@ export const StatsLeaderboard: React.FC<StatsLeaderboardProps> = ({ players, tea
       };
     });
 
-    deliveries.forEach(d => {
+    filteredDeliveries.forEach(d => {
       const runs = d.runs || 0;
       const isWide = d.extra_type === 'Wide';
       const isNoBall = d.extra_type === 'No Ball';
-      const isLegal = !isWide && !isNoBall;
+      const isRetiredOut = d.dismissal_type === 'Retired Out';
+      const isLegal = !isWide && !isNoBall && !isRetiredOut;
 
       if (d.striker && statsMap[d.striker]) {
         const stats = statsMap[d.striker].batting;
         stats.innings.add(d.inning);
-        if (!isWide) {
+        if (!isWide && !isRetiredOut) {
           const isByeOrLegBye = d.extra_type === 'Bye' || d.extra_type === 'Leg Bye';
           const runOffBat = isByeOrLegBye ? 0 : (isNoBall ? Math.max(0, runs - 1) : runs);
           stats.runs += runOffBat;
@@ -129,7 +161,7 @@ export const StatsLeaderboard: React.FC<StatsLeaderboardProps> = ({ players, tea
           if (runOffBat === 4) stats.fours += 1;
           if (runOffBat === 6) stats.sixes += 1;
         }
-        if (d.is_wicket && d.out_player === d.striker) {
+        if ((d.is_wicket || isRetiredOut) && d.out_player === d.striker) {
           stats.outs += 1;
         }
       }
@@ -192,14 +224,14 @@ export const StatsLeaderboard: React.FC<StatsLeaderboardProps> = ({ players, tea
     });
 
     setPlayerStats(finalMap);
-  }, [deliveries, players]);
+  }, [filteredDeliveries, players]);
 
   const getTeam = (teamId: string) => teams.find(t => t.id === teamId);
 
   // Aggregate Orange Cap (Most Runs)
   const getOrangeCap = (): LeaderboardEntry[] => {
     const runsMap: Record<string, number> = {};
-    deliveries.forEach((d) => {
+    filteredDeliveries.forEach((d) => {
       if (!d.striker) return;
       if (d.extra_type !== 'Wide') {
         const isNoBall = d.extra_type === 'No Ball';
@@ -228,7 +260,7 @@ export const StatsLeaderboard: React.FC<StatsLeaderboardProps> = ({ players, tea
   // Aggregate Purple Cap (Most Wickets - excluding run outs and retired outs)
   const getPurpleCap = (): LeaderboardEntry[] => {
     const wicketsMap: Record<string, number> = {};
-    deliveries.forEach((d) => {
+    filteredDeliveries.forEach((d) => {
       if (!d.bawler) return;
       if (d.is_wicket && d.dismissal_type !== 'Run Out' && d.dismissal_type !== 'Retired Out' && d.dismissal_type !== 'None') {
         wicketsMap[d.bawler] = (wicketsMap[d.bawler] || 0) + 1;
@@ -252,7 +284,7 @@ export const StatsLeaderboard: React.FC<StatsLeaderboardProps> = ({ players, tea
   // Aggregate Best Fielder (Catches + Run Outs)
   const getBestFielder = (): LeaderboardEntry[] => {
     const fieldingMap: Record<string, number> = {};
-    deliveries.forEach((d) => {
+    filteredDeliveries.forEach((d) => {
       if (d.is_wicket && (d.dismissal_type === 'Catch' || d.dismissal_type === 'Run Out') && d.fielder) {
         fieldingMap[d.fielder] = (fieldingMap[d.fielder] || 0) + 1;
       }
@@ -534,6 +566,68 @@ export const StatsLeaderboard: React.FC<StatsLeaderboardProps> = ({ players, tea
     );
   };
 
+  const analyticsData = React.useMemo(() => {
+    let totalRuns = 0;
+    let totalBalls = 0;
+    let totalWickets = 0;
+    let foursCount = 0;
+    let sixesCount = 0;
+    let dotBallsCount = 0;
+
+    let powerplayRuns = 0, powerplayBalls = 0, powerplayWkts = 0;
+    let middleRuns = 0, middleBalls = 0, middleWkts = 0;
+    let deathRuns = 0, deathBalls = 0, deathWkts = 0;
+
+    filteredDeliveries.forEach(d => {
+      const runs = d.runs || 0;
+      const isWide = d.extra_type === 'Wide';
+      const isNoBall = d.extra_type === 'No Ball';
+      const isLegal = !isWide && !isNoBall;
+
+      totalRuns += runs;
+      if (isLegal) totalBalls += 1;
+      if (d.is_wicket && d.dismissal_type !== 'Retired Out') totalWickets += 1;
+
+      if (d.runs_off_bat === 4) foursCount += 1;
+      if (d.runs_off_bat === 6) sixesCount += 1;
+      if (runs === 0 && d.extra_type === 'None') dotBallsCount += 1;
+
+      const overNum = d.over_number || 0;
+      if (overNum < 2) {
+        powerplayRuns += runs;
+        if (isLegal) powerplayBalls += 1;
+        if (d.is_wicket && d.dismissal_type !== 'Retired Out') powerplayWkts += 1;
+      } else if (overNum < 4) {
+        middleRuns += runs;
+        if (isLegal) middleBalls += 1;
+        if (d.is_wicket && d.dismissal_type !== 'Retired Out') middleWkts += 1;
+      } else {
+        deathRuns += runs;
+        if (isLegal) deathBalls += 1;
+        if (d.is_wicket && d.dismissal_type !== 'Retired Out') deathWkts += 1;
+      }
+    });
+
+    const boundaryRuns = (foursCount * 4) + (sixesCount * 6);
+    const boundaryPct = totalRuns === 0 ? 0 : Math.round((boundaryRuns / totalRuns) * 100);
+    const dotPct = totalBalls === 0 ? 0 : Math.round((dotBallsCount / totalBalls) * 100);
+
+    return {
+      totalRuns,
+      totalBalls,
+      totalWickets,
+      foursCount,
+      sixesCount,
+      boundaryRuns,
+      boundaryPct,
+      dotBallsCount,
+      dotPct,
+      powerplay: { runs: powerplayRuns, balls: powerplayBalls, wkts: powerplayWkts, rr: powerplayBalls === 0 ? '0.0' : ((powerplayRuns / powerplayBalls) * 6).toFixed(1) },
+      middle: { runs: middleRuns, balls: middleBalls, wkts: middleWkts, rr: middleBalls === 0 ? '0.0' : ((middleRuns / middleBalls) * 6).toFixed(1) },
+      death: { runs: deathRuns, balls: deathBalls, wkts: deathWkts, rr: deathBalls === 0 ? '0.0' : ((deathRuns / deathBalls) * 6).toFixed(1) }
+    };
+  }, [filteredDeliveries]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -546,55 +640,202 @@ export const StatsLeaderboard: React.FC<StatsLeaderboardProps> = ({ players, tea
     <div className="max-w-7xl mx-auto py-8 px-4">
       
       {/* Title */}
-      <div className="text-center mb-10">
+      <div className="text-center mb-8">
         <h2 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 via-teal-200 to-violet-400 bg-clip-text text-transparent">
-          Stats Leaderboard
+          Stats & Tournament Analytics
         </h2>
         <p className="text-xs text-slate-400 mt-1">
           {isTournamentEnded 
-            ? 'Tournament cap winners (Hover rows to view complete player details)' 
-            : 'Real-time tournament-wide statistical caps (Hover rows to view complete player details)'}
+            ? 'Tournament cap winners and full performance analytics' 
+            : 'Real-time tournament-wide statistical caps and interactive performance insights'}
         </p>
+
+        {/* Phase Filter Badge Indicator */}
+        {phaseSetting !== 'All' && (
+          <div className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 bg-violet-500/10 border border-violet-500/25 rounded-full text-[10px] font-extrabold text-violet-400 uppercase tracking-widest">
+            <Layers className="w-3 h-3" />
+            <span>Calculating Stats From: {phaseSetting} Onwards</span>
+          </div>
+        )}
+
+        {/* Sub Navigation Bar */}
+        <div className="flex justify-center mt-6">
+          <div className="flex items-center p-1 bg-slate-950/60 rounded-xl border border-slate-800/80">
+            <button
+              onClick={() => setActiveSubTab('caps')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeSubTab === 'caps'
+                  ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 border border-emerald-500/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Crown className="w-4 h-4 text-amber-400" />
+              <span>Caps & Awards</span>
+            </button>
+            <button
+              onClick={() => setActiveSubTab('analytics')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeSubTab === 'analytics'
+                  ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 border border-emerald-500/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4 text-emerald-400" />
+              <span>Advanced Analytics</span>
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Grid containing the 3 Caps */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {renderLeaderboardCard(
-          'Orange Cap', 
-          'Most Runs Scored', 
-          orangeCapList, 
-          'runs', 
-          'neon-glow-amber', 
-          'bg-amber-500/10 border-amber-500/20 text-amber-400', 
-          Flame
-        )}
-        {renderLeaderboardCard(
-          'Purple Cap', 
-          'Most Wickets Taken', 
-          purpleCapList, 
-          'wkts', 
-          'neon-glow-violet', 
-          'bg-violet-500/10 border-violet-500/20 text-violet-400', 
-          Sparkles
-        )}
-        {renderLeaderboardCard(
-          'Best Fielder', 
-          'Catches + Run Outs', 
-          fielderList, 
-          'outs', 
-          'neon-glow-emerald', 
-          'bg-emerald-500/10 border-emerald-500/20 text-emerald-400', 
-          Award
-        )}
-      </div>
+      {activeSubTab === 'caps' ? (
+        <>
+          {/* Grid containing the 3 Caps */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {renderLeaderboardCard(
+              'Orange Cap', 
+              'Most Runs Scored', 
+              orangeCapList, 
+              'runs', 
+              'neon-glow-amber', 
+              'bg-amber-500/10 border-amber-500/20 text-amber-400', 
+              Flame
+            )}
+            {renderLeaderboardCard(
+              'Purple Cap', 
+              'Most Wickets Taken', 
+              purpleCapList, 
+              'wkts', 
+              'neon-glow-violet', 
+              'bg-violet-500/10 border-violet-500/20 text-violet-400', 
+              Sparkles
+            )}
+            {renderLeaderboardCard(
+              'Best Fielder', 
+              'Catches + Run Outs', 
+              fielderList, 
+              'outs', 
+              'neon-glow-emerald', 
+              'bg-emerald-500/10 border-emerald-500/20 text-emerald-400', 
+              Award
+            )}
+          </div>
+        </>
+      ) : (
+        /* ADVANCED ANALYTICAL DASHBOARD VIEW */
+        <div className="space-y-8 animate-fade-in">
+          
+          {/* Top KPI Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="glass-panel p-4 rounded-2xl border border-slate-800/80 text-center bg-slate-950/40">
+              <span className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest block">Total Tournament Runs</span>
+              <span className="text-2xl sm:text-3xl font-black text-emerald-400 mt-1 block">{analyticsData.totalRuns}</span>
+              <span className="text-[9px] text-slate-500 block mt-1">{Math.floor(analyticsData.totalBalls / 6)}.{analyticsData.totalBalls % 6} overs bowled</span>
+            </div>
+
+            <div className="glass-panel p-4 rounded-2xl border border-slate-800/80 text-center bg-slate-950/40">
+              <span className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest block">Total Wickets Fallen</span>
+              <span className="text-2xl sm:text-3xl font-black text-rose-400 mt-1 block">{analyticsData.totalWickets}</span>
+              <span className="text-[9px] text-slate-500 block mt-1">Tournament Wickets</span>
+            </div>
+
+            <div className="glass-panel p-4 rounded-2xl border border-slate-800/80 text-center bg-slate-950/40">
+              <span className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest block">Boundary Run %</span>
+              <span className="text-2xl sm:text-3xl font-black text-amber-400 mt-1 block">{analyticsData.boundaryPct}%</span>
+              <span className="text-[9px] text-slate-500 block mt-1">{analyticsData.boundaryRuns} runs in boundaries</span>
+            </div>
+
+            <div className="glass-panel p-4 rounded-2xl border border-slate-800/80 text-center bg-slate-950/40">
+              <span className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest block">Tournament Dot Ball %</span>
+              <span className="text-2xl sm:text-3xl font-black text-violet-400 mt-1 block">{analyticsData.dotPct}%</span>
+              <span className="text-[9px] text-slate-500 block mt-1">{analyticsData.dotBallsCount} dot deliveries</span>
+            </div>
+          </div>
+
+          {/* Phase-wise Analytics Breakdown */}
+          <div className="glass-panel p-6 rounded-2xl border border-slate-800/80 space-y-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-emerald-400" />
+              Overs Phase Performance Breakdown
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Powerplay */}
+              <div className="bg-slate-950/50 border border-slate-850 p-5 rounded-xl space-y-3 relative overflow-hidden">
+                <div className="flex justify-between items-center border-b border-slate-850 pb-2">
+                  <span className="text-xs font-black text-emerald-400 uppercase tracking-wider">Powerplay (Overs 1 - 2)</span>
+                  <span className="text-[10px] text-slate-500 font-bold uppercase">{analyticsData.powerplay.rr} RPO</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-bold block">Runs</span>
+                    <span className="font-extrabold text-slate-200">{analyticsData.powerplay.runs}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-bold block">Balls</span>
+                    <span className="font-extrabold text-slate-200">{analyticsData.powerplay.balls}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-bold block">Wickets</span>
+                    <span className="font-extrabold text-rose-400">{analyticsData.powerplay.wkts}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Middle Overs */}
+              <div className="bg-slate-950/50 border border-slate-850 p-5 rounded-xl space-y-3 relative overflow-hidden">
+                <div className="flex justify-between items-center border-b border-slate-850 pb-2">
+                  <span className="text-xs font-black text-teal-400 uppercase tracking-wider">Middle Overs (Overs 3 - 4)</span>
+                  <span className="text-[10px] text-slate-500 font-bold uppercase">{analyticsData.middle.rr} RPO</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-bold block">Runs</span>
+                    <span className="font-extrabold text-slate-200">{analyticsData.middle.runs}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-bold block">Balls</span>
+                    <span className="font-extrabold text-slate-200">{analyticsData.middle.balls}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-bold block">Wickets</span>
+                    <span className="font-extrabold text-rose-400">{analyticsData.middle.wkts}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Death Overs */}
+              <div className="bg-slate-950/50 border border-slate-850 p-5 rounded-xl space-y-3 relative overflow-hidden">
+                <div className="flex justify-between items-center border-b border-slate-850 pb-2">
+                  <span className="text-xs font-black text-amber-400 uppercase tracking-wider">Death Overs (Overs 5+)</span>
+                  <span className="text-[10px] text-slate-500 font-bold uppercase">{analyticsData.death.rr} RPO</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-bold block">Runs</span>
+                    <span className="font-extrabold text-slate-200">{analyticsData.death.runs}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-bold block">Balls</span>
+                    <span className="font-extrabold text-slate-200">{analyticsData.death.balls}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-bold block">Wickets</span>
+                    <span className="font-extrabold text-rose-400">{analyticsData.death.wkts}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Boundaries Tracker Panel */}
-      {deliveries.length > 0 && (() => {
-        const totalSixes = deliveries.filter(d => d.runs_off_bat === 6).length;
-        const totalFours = deliveries.filter(d => d.runs_off_bat === 4).length;
+      {filteredDeliveries.length > 0 && (() => {
+        const totalSixes = filteredDeliveries.filter(d => d.runs_off_bat === 6).length;
+        const totalFours = filteredDeliveries.filter(d => d.runs_off_bat === 4).length;
 
         const teamStats = teams.map(team => {
-          const teamDels = deliveries.filter(d => d.expand?.striker?.team === team.id);
+          const teamDels = filteredDeliveries.filter(d => d.expand?.striker?.team === team.id);
           const sixes = teamDels.filter(d => d.runs_off_bat === 6).length;
           const fours = teamDels.filter(d => d.runs_off_bat === 4).length;
           return {

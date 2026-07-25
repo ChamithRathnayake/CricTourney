@@ -3,7 +3,8 @@ import { pb, getFileUrl, getTeamLogo, getUserRole } from '../services/pocketbase
 import type { Match, Team, Player, Inning, Delivery, News, TournamentConfig } from '../services/pocketbase';
 import { Settings, Play, Disc, RotateCcw, AlertTriangle, CheckCircle, Plus, Users, Edit, Trash2, Upload, FileSpreadsheet, X, Trophy, Check, Loader2, FileText } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { parseStage, getStageName, getRoundName } from '../services/bracketUtils';
+import { parseStage, getStageName, getRoundName, getOrdinal } from '../services/bracketUtils';
+
 
 interface DragScrollContainerProps {
   children: React.ReactNode;
@@ -166,6 +167,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
   const [extraRuns, setExtraRuns] = useState<number>(0);
   const [noBallRunsType, setNoBallRunsType] = useState<'Off Bat' | 'Byes'>('Off Bat');
   const [runoutNoBallType, setRunoutNoBallType] = useState<'Off Bat' | 'Byes'>('Off Bat');
+  const [forceExtraBall, setForceExtraBall] = useState(false);
 
   // Setup UI loading/error
   const [errorMsg, setErrorMsg] = useState('');
@@ -197,6 +199,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
   const [mosPerformance, setMosPerformance] = useState('');
   const [showEpfNumber, setShowEpfNumber] = useState(false);
   const [strictFantasyRoles, setStrictFantasyRoles] = useState(true);
+  const [statsFromPhase, setStatsFromPhase] = useState<'All' | 'Quarter Finals' | 'Semi Finals'>('All');
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isInitializingBracket, setIsInitializingBracket] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -207,6 +210,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
       setMosPerformance(tournamentConfig.mos_performance || '');
       setShowEpfNumber(!!tournamentConfig.show_epf_number);
       setStrictFantasyRoles(tournamentConfig.strict_fantasy_roles !== false);
+      setStatsFromPhase(tournamentConfig.stats_from_phase || 'All');
     }
   }, [tournamentConfig]);
 
@@ -431,27 +435,33 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
         const activeDel = delList.filter(d => d.inning === activeInn.id);
         if (isInitialLoad) {
           if (activeDel.length > 0) {
-            if (currentStriker) setStrikerId(currentStriker);
-            else setStrikerId(activeDel[activeDel.length - 1].striker);
+            const lastDel = activeDel[activeDel.length - 1];
+            const validStriker = currentStriker && players.find(p => p.id === currentStriker)?.team === activeInn.batting_team ? currentStriker : lastDel.striker;
+            const validBowler = currentBowler && players.find(p => p.id === currentBowler)?.team === activeInn.bawling_team ? currentBowler : lastDel.bawler;
 
-            if (currentBowler) setBowlerId(currentBowler);
-            else setBowlerId(activeDel[activeDel.length - 1].bawler);
+            setStrikerId(validStriker);
+            setBowlerId(validBowler);
 
-            if (currentNonStriker) setNonStrikerId(currentNonStriker);
-            else {
-              const lastDel = activeDel[activeDel.length - 1];
+            if (currentNonStriker && players.find(p => p.id === currentNonStriker)?.team === activeInn.batting_team) {
+              setNonStrikerId(currentNonStriker);
+            } else {
               const diffStriker = activeDel.slice().reverse().find(d => d.striker && d.striker !== lastDel.striker);
               if (diffStriker) {
                 const isOut = activeDel.some(d => d.is_wicket && d.out_player === diffStriker.striker);
                 if (!isOut) {
                   setNonStrikerId(diffStriker.striker);
+                } else {
+                  setNonStrikerId('');
                 }
+              } else {
+                setNonStrikerId('');
               }
             }
           } else {
-            if (currentStriker) setStrikerId(currentStriker);
-            if (currentNonStriker) setNonStrikerId(currentNonStriker);
-            if (currentBowler) setBowlerId(currentBowler);
+            // New inning with 0 deliveries - reset players unless they match the active inning teams
+            setStrikerId(currentStriker && players.find(p => p.id === currentStriker)?.team === activeInn.batting_team ? currentStriker : '');
+            setNonStrikerId(currentNonStriker && players.find(p => p.id === currentNonStriker)?.team === activeInn.batting_team ? currentNonStriker : '');
+            setBowlerId(currentBowler && players.find(p => p.id === currentBowler)?.team === activeInn.bawling_team ? currentBowler : '');
           }
         }
       } else {
@@ -751,7 +761,8 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
         man_of_the_series: mosPlayerId || null,
         mos_performance: mosPerformance.trim() || '',
         show_epf_number: showEpfNumber,
-        strict_fantasy_roles: strictFantasyRoles
+        strict_fantasy_roles: strictFantasyRoles,
+        stats_from_phase: statsFromPhase
       };
 
       if (tournamentConfig) {
@@ -1446,7 +1457,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
           }
 
           if (d.striker) {
-            if (!isWide) {
+            if (!isWide && d.dismissal_type !== 'Retired Out') {
               batsmanRuns[d.striker] = (batsmanRuns[d.striker] || 0) + runOffBat;
               batsmanBalls[d.striker] = (batsmanBalls[d.striker] || 0) + 1;
 
@@ -1457,7 +1468,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
               }
             }
 
-            if (d.is_wicket && d.out_player) {
+            if ((d.is_wicket || d.dismissal_type === 'Retired Out') && d.out_player) {
               const bowlerName = d.expand?.bawler?.name || 'Bowler';
               const fielderName = d.expand?.fielder?.name || 'Fielder';
 
@@ -1480,7 +1491,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
           }
 
           if (d.bawler) {
-            if (isLegal) {
+            if (isLegal && d.dismissal_type !== 'Retired Out') {
               bowlerBalls[d.bawler] = (bowlerBalls[d.bawler] || 0) + 1;
             }
             if (d.extra_type !== 'Bye' && d.extra_type !== 'Leg Bye') {
@@ -1859,7 +1870,10 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
   // Active inning stats calculations
   const inningDeliveries = activeInning ? deliveries.filter(d => d.inning === activeInning.id) : [];
   const legalBallsCount = inningDeliveries.filter(d => {
-    if (selectedMatch?.special_extras) return true;
+    if (d.dismissal_type === 'Retired Out') return false;
+    if (selectedMatch?.special_extras) {
+      return d.ball_number > 0;
+    }
     return d.extra_type !== 'Wide' && d.extra_type !== 'No Ball';
   }).length;
   const totalRuns = inningDeliveries.reduce((sum, d) => sum + (d.runs || 0), 0);
@@ -1879,13 +1893,28 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
 
   const isOversLimitMet = legalBallsCount >= oversLimit * 6;
   const isAllOut = totalWickets >= maxWickets;
-  const isScoringLocked = isTargetChased || isOversLimitMet || isAllOut;
+
+  const isPlayerSelectionValid = Boolean(
+    activeInning &&
+    strikerId && 
+    nonStrikerId && 
+    bowlerId && 
+    strikerId !== nonStrikerId &&
+    players.find(p => p.id === strikerId)?.team === activeInning.batting_team &&
+    players.find(p => p.id === nonStrikerId)?.team === activeInning.batting_team &&
+    players.find(p => p.id === bowlerId)?.team === activeInning.bawling_team
+  );
+
+  const isScoringLocked = isTargetChased || isOversLimitMet || isAllOut || !isPlayerSelectionValid;
   
   // Bowler delivery count mapping
   const getBowlerBalls = (playerId: string) => {
     return inningDeliveries.filter(d => {
       if (d.bawler !== playerId) return false;
-      if (selectedMatch?.special_extras) return true;
+      if (d.dismissal_type === 'Retired Out') return false;
+      if (selectedMatch?.special_extras) {
+        return d.ball_number > 0;
+      }
       return d.extra_type !== 'Wide' && d.extra_type !== 'No Ball';
     }).length;
   };
@@ -2037,12 +2066,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
         formData.append('logo', editTeamLogo);
       }
 
-      await pb.collection('teams').update(editingTeam.id, {
-        name: editTeamName,
-        short_name: editTeamShortName,
-        captain: editTeamCaptainId || null,
-        ...(editTeamLogo ? { logo: editTeamLogo } : {})
-      });
+      await pb.collection('teams').update(editingTeam.id, formData);
       setSuccessMsg(`Team "${editTeamName}" updated successfully!`);
       setEditingTeam(null);
       setEditTeamLogo(null);
@@ -2069,13 +2093,16 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
         }
       }
 
-      await pb.collection('players').update(editingPlayer.id, {
-        name: editPlayerName,
-        role: editPlayerRole,
-        team: editPlayerTeamId,
-        epf_number: editPlayerEpf,
-        ...(editPlayerPhoto ? { photo: editPlayerPhoto } : {})
-      });
+      const formData = new FormData();
+      formData.append('name', editPlayerName);
+      formData.append('role', editPlayerRole);
+      formData.append('team', editPlayerTeamId);
+      formData.append('epf_number', editPlayerEpf || '');
+      if (editPlayerPhoto) {
+        formData.append('photo', editPlayerPhoto);
+      }
+
+      await pb.collection('players').update(editingPlayer.id, formData);
       setSuccessMsg(`Player "${editPlayerName}" updated successfully!`);
       setEditingPlayer(null);
       setEditPlayerPhoto(null);
@@ -2400,7 +2427,8 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
     runs: number, 
     isExtra = false, 
     extraType: 'None' | 'Wide' | 'No Ball' | 'Bye' | 'Leg Bye' = 'None',
-    runsOffBat?: number
+    runsOffBat?: number,
+    forceExtra = false
   ) => {
     if (!selectedMatch || !activeInning) return;
     if (!strikerId || !nonStrikerId || !bowlerId) {
@@ -2425,11 +2453,12 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
         if (isWide) finalRuns = runs; // preserve total runs (4 penalty + completed runs run)
       }
       
-      const isLegal = selectedMatch.special_extras ? true : (!isWide && !isNoBall);
+      const isLegal = selectedMatch.special_extras ? (!forceExtra) : (!isWide && !isNoBall);
+      setForceExtraBall(false);
 
       // 1. Create Delivery
       const overNum = Math.floor(legalBallsCount / 6);
-      const ballNum = (legalBallsCount % 6) + 1;
+      const ballNum = isLegal ? ((legalBallsCount % 6) + 1) : 0;
       const finalRunsOffBat = runsOffBat !== undefined ? runsOffBat : (extraType === 'None' ? runs : 0);
 
       await pb.collection('deliveries').create<Delivery>({
@@ -2437,7 +2466,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
         striker: strikerId,
         bawler: bowlerId,
         over_number: overNum,
-        ball_number: isLegal ? ballNum : (legalBallsCount % 6), // wide/no ball doesn't advance legal ball number
+        ball_number: ballNum,
         runs: finalRuns,
         runs_off_bat: finalRunsOffBat,
         is_extra: isExtra,
@@ -2458,6 +2487,11 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
         total_runs: newRuns,
         total_overs: parseFloat(newOversStr)
       });
+
+      // Clear bowler selection if this legal ball completed the over (ball 6)
+      if (isLegal && (legalBallsCount + 1) % 6 === 0) {
+        setBowlerId('');
+      }
 
       // 3. Rotate strikers using robust XOR logic (resolves React state batching race conditions)
       const runsRun = selectedMatch.special_extras && (isWide || isNoBall)
@@ -2529,9 +2563,13 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
 
       const isExtraVal = isRunOut ? runoutExtraType !== 'None' : false;
       const extraTypeVal = isRunOut ? runoutExtraType : 'None';
-      const isLegal = selectedMatch.special_extras 
-        ? true 
-        : (isRunOut ? (runoutExtraType !== 'Wide' && runoutExtraType !== 'No Ball') : true);
+      const isRetiredOut = dismissalType === 'Retired Out';
+      const isWicketVal = !isRetiredOut;
+      const isLegal = isRetiredOut 
+        ? false 
+        : (selectedMatch.special_extras 
+            ? true 
+            : (isRunOut ? (runoutExtraType !== 'Wide' && runoutExtraType !== 'No Ball') : true));
 
       const overNum = Math.floor(legalBallsCount / 6);
       const ballNum = (legalBallsCount % 6) + 1;
@@ -2547,14 +2585,14 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
         runs_off_bat: runsOffBatVal,
         is_extra: isExtraVal,
         extra_type: extraTypeVal,
-        is_wicket: true,
+        is_wicket: isWicketVal,
         dismissal_type: dismissalType,
         out_player: outPlayerId,
         fielder: fielderId
       });
 
       // 2. Update Inning totals
-      const newWickets = activeInning.total_wickets + 1;
+      const newWickets = isRetiredOut ? activeInning.total_wickets : activeInning.total_wickets + 1;
       const newLegalBallsCount = isLegal ? legalBallsCount + 1 : legalBallsCount;
       const newOversStr = `${Math.floor(newLegalBallsCount / 6)}.${newLegalBallsCount % 6}`;
 
@@ -2801,6 +2839,48 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
     );
   };
 
+  const handleRescheduleMatch = async () => {
+    if (!selectedMatch) return;
+    triggerConfirm(
+      "Reset & Reschedule Match (Rain/Interruption)",
+      `Are you sure you want to reset and reschedule "${selectedMatch.stage}"? ALL recorded innings, deliveries, and scores for this match will be deleted, and the match status will return to Upcoming for a fresh start.`,
+      async () => {
+        try {
+          // Delete all innings and deliveries for this match
+          const matchInnings = await pb.collection('innings').getFullList<Inning>({
+            filter: `match="${selectedMatch.id}"`
+          });
+          for (const inn of matchInnings) {
+            const innDels = await pb.collection('deliveries').getFullList<Delivery>({
+              filter: `inning="${inn.id}"`
+            });
+            for (const d of innDels) {
+              await pb.collection('deliveries').delete(d.id);
+            }
+            await pb.collection('innings').delete(inn.id);
+          }
+
+          // Reset match status to Upcoming
+          await pb.collection('matches').update(selectedMatch.id, {
+            status: 'Upcoming',
+            winner: '',
+            delay_reason: ''
+          });
+
+          setSelectedMatch(null);
+          setInnings([]);
+          setDeliveries([]);
+          setSuccessMsg('Match reset successfully! Scheduled as Upcoming.');
+          refreshData();
+        } catch (err: any) {
+          setScorerErrorMsg(err.message || 'Error rescheduling match.');
+          setShowScorerErrorModal(true);
+        }
+      },
+      { confirmText: "Reset & Reschedule Match", isDanger: true }
+    );
+  };
+
   const cascadeResetPromotions = async (completedMatch: Match) => {
     const parsed = parseStage(completedMatch.stage);
     if (parsed.round <= 1) return;
@@ -2905,24 +2985,25 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
   };
 
   const isBowlerDisabled = (pId: string) => {
-    if (pId === bowlerId) return false; // Never disable the currently selected bowler
+    if (!activeInning || inningDeliveries.length === 0) return false;
     
-    // 1. Max 12 balls (2 overs) per bowler
-    if (getBowlerBalls(pId) >= 12) return true;
+    // Find all legal deliveries in current inning
+    const legalDels = inningDeliveries.filter(d => {
+      if (selectedMatch?.special_extras) {
+        return d.ball_number > 0;
+      }
+      return d.extra_type !== 'Wide' && d.extra_type !== 'No Ball';
+    });
 
-    // 2. Cannot bowl consecutive overs
-    const lastDel = inningDeliveries[inningDeliveries.length - 1];
-    if (lastDel) {
-      const lastLegalBallsCount = inningDeliveries.filter(d => {
-        if (selectedMatch?.special_extras) return true;
-        return d.extra_type !== 'Wide' && d.extra_type !== 'No Ball';
-      }).length;
-      const isOverTransition = lastLegalBallsCount % 6 === 0;
-      if (isOverTransition && lastDel.bawler === pId) {
-        return true;
+    const totalLegalCount = legalDels.length;
+
+    // If an over has just completed (6, 12, 18, etc. legal balls)
+    if (totalLegalCount > 0 && totalLegalCount % 6 === 0) {
+      const lastLegalDel = legalDels[legalDels.length - 1];
+      if (lastLegalDel && lastLegalDel.bawler === pId) {
+        return true; // Cannot bowl 2 consecutive overs!
       }
     }
-
     return false;
   };
 
@@ -2946,7 +3027,10 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
       let label = `${d.runs}`;
       let badgeClass = "bg-slate-800 text-slate-300 border border-slate-700/60";
 
-      if (d.is_wicket) {
+      if (d.dismissal_type === 'Retired Out') {
+        label = "Ret";
+        badgeClass = "bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold";
+      } else if (d.is_wicket) {
         if (d.dismissal_type === 'Run Out') {
           const isWide = d.extra_type === 'Wide';
           const isNoBall = d.extra_type === 'No Ball';
@@ -3006,7 +3090,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
         chronoItems.push({
           type: 'over-divider',
           id: `div-${d.over_number}`,
-          label: `${d.over_number + 1}th`,
+          label: getOrdinal(d.over_number + 1),
           badgeClass: "",
           overNum: d.over_number + 1,
           overRuns
@@ -3024,7 +3108,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
           chronoItems.push({
             type: 'over-divider',
             id: `div-${lastDel.over_number}`,
-            label: `${lastDel.over_number + 1}th`,
+            label: getOrdinal(lastDel.over_number + 1),
             badgeClass: "",
             overNum: lastDel.over_number + 1,
             overRuns
@@ -3077,7 +3161,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
       } else if (d.dismissal_type === 'Hit Wicket') {
         return 'OUT! Hit Wicket.';
       } else if (d.dismissal_type === 'Retired Out') {
-        return 'OUT! Retired Out.';
+        return 'Retired Out. Batter leaves the field to the dugout (no ball consumed).';
       }
       return 'OUT!';
     }
@@ -3086,10 +3170,15 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
       if (d.extra_type === 'Wide') {
         const baseWide = selectedMatch?.special_extras ? 4 : 1;
         const completed = runs - baseWide;
+        const isReBowl = d.ball_number === 0;
         return selectedMatch?.special_extras 
-          ? (completed > 0
-            ? `Wide. Batters ran ${completed} bye(s) (${runs} runs total, counted as legal ball).`
-            : `Wide (4 runs, counted as legal ball).`)
+          ? (isReBowl
+            ? (completed > 0
+              ? `Wide. Batters ran ${completed} bye(s) (${runs} runs total, extra ball required).`
+              : `Wide (4 runs, extra ball required).`)
+            : (completed > 0
+              ? `Wide. Batters ran ${completed} bye(s) (${runs} runs total, counted as legal ball).`
+              : `Wide (4 runs, counted as legal ball).`))
           : (completed > 0
             ? `Wide. Batters ran ${completed} bye(s) (${runs} runs total).`
             : `Wide. 1 run total.`);
@@ -3099,16 +3188,29 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
         const runOffBat = d.runs_off_bat !== undefined && d.runs_off_bat !== null 
           ? d.runs_off_bat 
           : (selectedMatch?.special_extras ? Math.max(0, runs - 6) : Math.max(0, runs - 1));
+        const isReBowl = d.ball_number === 0;
         
         if (selectedMatch?.special_extras) {
-          if (completed > 0) {
-            if (runOffBat > 0) {
-              return `No Ball. Batsman scored ${runOffBat} run(s) off bat (${runs} runs total, counted as legal ball).`;
+          if (isReBowl) {
+            if (completed > 0) {
+              if (runOffBat > 0) {
+                return `No Ball. Batsman scored ${runOffBat} run(s) off bat (${runs} runs total, extra ball required).`;
+              } else {
+                return `No Ball. Batters ran ${completed} bye(s) (${runs} runs total, extra ball required).`;
+              }
             } else {
-              return `No Ball. Batters ran ${completed} bye(s) (${runs} runs total, counted as legal ball).`;
+              return `No Ball (6 runs, extra ball required).`;
             }
           } else {
-            return `No Ball (6 runs, counted as legal ball).`;
+            if (completed > 0) {
+              if (runOffBat > 0) {
+                return `No Ball. Batsman scored ${runOffBat} run(s) off bat (${runs} runs total, counted as legal ball).`;
+              } else {
+                return `No Ball. Batters ran ${completed} bye(s) (${runs} runs total, counted as legal ball).`;
+              }
+            } else {
+              return `No Ball (6 runs, counted as legal ball).`;
+            }
           }
         } else {
           if (completed > 0) {
@@ -3172,7 +3274,10 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
 
       const isWide = d.extra_type === 'Wide';
       const isNoBall = d.extra_type === 'No Ball';
-      const isLegal = selectedMatch?.special_extras ? true : (!isWide && !isNoBall);
+      const isRetiredOut = d.dismissal_type === 'Retired Out';
+      const isLegal = isRetiredOut 
+        ? false 
+        : (selectedMatch?.special_extras ? (d.ball_number > 0) : (!isWide && !isNoBall));
 
       if (isLegal) {
         tBalls += 1;
@@ -3609,7 +3714,9 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                       const data = {
                         man_of_the_series: mosPlayerId || null,
                         mos_performance: mosPerformance.trim() || '',
-                        show_epf_number: newShowEpf
+                        show_epf_number: newShowEpf,
+                        strict_fantasy_roles: strictFantasyRoles,
+                        stats_from_phase: statsFromPhase
                       };
                       if (tournamentConfig) {
                         await pb.collection('tournament_config').update(tournamentConfig.id, data);
@@ -3654,7 +3761,8 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                         man_of_the_series: mosPlayerId || null,
                         mos_performance: mosPerformance.trim() || '',
                         show_epf_number: showEpfNumber,
-                        strict_fantasy_roles: newStrict
+                        strict_fantasy_roles: newStrict,
+                        stats_from_phase: statsFromPhase
                       };
                       if (tournamentConfig) {
                         await pb.collection('tournament_config').update(tournamentConfig.id, data);
@@ -3680,6 +3788,49 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                   />
                 </button>
               </div>
+
+              <div className="bg-slate-950/40 border border-slate-800/60 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <span className="text-xs font-bold text-slate-200 block">Calculate Tournament Stats From Phase</span>
+                  <span className="text-[10px] text-slate-500 block">Filter leaderboard calculation from start of tournament or specific knockout rounds</span>
+                </div>
+                <select
+                  value={statsFromPhase}
+                  onChange={async (e) => {
+                    const newPhase = e.target.value as 'All' | 'Quarter Finals' | 'Semi Finals';
+                    setStatsFromPhase(newPhase);
+                    setIsSavingConfig(true);
+                    setErrorMsg('');
+                    setSuccessMsg('');
+                    try {
+                      const data = {
+                        man_of_the_series: mosPlayerId || null,
+                        mos_performance: mosPerformance.trim() || '',
+                        show_epf_number: showEpfNumber,
+                        strict_fantasy_roles: strictFantasyRoles,
+                        stats_from_phase: newPhase
+                      };
+                      if (tournamentConfig) {
+                        await pb.collection('tournament_config').update(tournamentConfig.id, data);
+                      } else {
+                        await pb.collection('tournament_config').create(data);
+                      }
+                      setSuccessMsg(`Stats calculation phase set to "${newPhase}"!`);
+                      refreshData();
+                    } catch (err: any) {
+                      setErrorMsg(err.message || 'Error updating configuration.');
+                    } finally {
+                      setIsSavingConfig(false);
+                    }
+                  }}
+                  className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/50 cursor-pointer shrink-0"
+                >
+                  <option value="All">All Tournament (Since Start)</option>
+                  <option value="Quarter Finals">From Quarter-Finals Onwards</option>
+                  <option value="Semi Finals">From Semi-Finals Onwards</option>
+                </select>
+              </div>
+
               <button
                 type="button"
                 disabled={isExporting}
@@ -4873,6 +5024,14 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                         </button>
                       </div>
                     )}
+
+                    <button
+                      onClick={handleRescheduleMatch}
+                      className="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/40 text-rose-400 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Reschedule Match</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -4965,7 +5124,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                 <div className="glass-panel p-4 rounded-xl border border-slate-800/80">
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">
                     <Disc className="w-3.5 h-3.5 text-slate-500" />
-                    Current Bowler (Max 2 Overs)
+                    Current Bowler (No Consecutive Overs)
                   </label>
                   <select
                     value={bowlerId}
@@ -4975,8 +5134,8 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                     <option value="">Select Bowler</option>
                     {(() => {
                       const { playing, bench } = getPlayersByGroup(activeInning.bawling_team);
-                      const filteredPlaying = playing.filter(p => p.id === bowlerId || getBowlerBalls(p.id) < 12);
-                      const filteredBench = bench.filter(p => p.id === bowlerId || getBowlerBalls(p.id) < 12);
+                      const filteredPlaying = playing;
+                      const filteredBench = bench;
                       return (
                         <>
                           {filteredPlaying.length > 0 && (
@@ -4986,7 +5145,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                                 const isLimit = isBowlerDisabled(p.id);
                                 return (
                                   <option key={p.id} value={p.id} disabled={isLimit}>
-                                    {formatPlayerName(p)} ({Math.floor(balls/6)}.{balls%6} ov) {isLimit ? '[LIMIT REACHED]' : ''}
+                                    {formatPlayerName(p)} ({Math.floor(balls/6)}.{balls%6} ov) {isLimit ? '[CANNOT BOWL CONSECUTIVE OVERS]' : ''}
                                   </option>
                                 );
                               })}
@@ -4999,7 +5158,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                                 const isLimit = isBowlerDisabled(p.id);
                                 return (
                                   <option key={p.id} value={p.id} disabled={isLimit}>
-                                    {formatPlayerName(p)} ({Math.floor(balls/6)}.{balls%6} ov) {isLimit ? '[LIMIT REACHED]' : ''} (Bench)
+                                    {formatPlayerName(p)} ({Math.floor(balls/6)}.{balls%6} ov) {isLimit ? '[CANNOT BOWL CONSECUTIVE OVERS]' : ''} (Bench)
                                   </option>
                                 );
                               })}
@@ -5185,6 +5344,15 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                   </div>
                 )}
 
+                {!isTargetChased && !isOversLimitMet && !isAllOut && !isPlayerSelectionValid && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-4 py-3 rounded-xl text-xs font-bold flex items-center gap-2 mb-6">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>
+                      <strong>Player Selection Required:</strong> Please select <strong>Striker</strong> &amp; <strong>Non-Striker</strong> from {getTeam(activeInning.batting_team)?.short_name || 'Batting Team'} and a <strong>Bowler</strong> from {getTeam(activeInning.bawling_team)?.short_name || 'Bowling Team'} to enable scoring.
+                    </span>
+                  </div>
+                )}
+
                 <div>
                   <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Record Score</span>
                   <h4 className="text-sm font-extrabold text-slate-300 mt-1">Runs scored off bat (legal ball):</h4>
@@ -5288,6 +5456,22 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                         </div>
                       )}
 
+                      {/* Special extras extra ball toggle for final over / target defense */}
+                      {selectedMatch.special_extras && (selectedExtra === 'Wide' || selectedExtra === 'No Ball') && (
+                        <label className="flex items-center gap-2 p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl cursor-pointer select-none mb-3">
+                          <input 
+                            type="checkbox" 
+                            checked={forceExtraBall} 
+                            onChange={(e) => setForceExtraBall(e.target.checked)}
+                            className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                          />
+                          <div>
+                            <span className="text-xs font-bold text-amber-300 block">Re-bowl Extra Ball (Target Defense / Final Over Rule)</span>
+                            <span className="text-[9px] text-amber-400/80 block">Check this to require bowler to bowl an extra ball for this delivery</span>
+                          </div>
+                        </label>
+                      )}
+
                       {/* Submit extra ball */}
                       <button
                         onClick={() => {
@@ -5303,7 +5487,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                               runsOffBat = extraRuns;
                             }
                           }
-                          recordBall(total, true, selectedExtra, runsOffBat);
+                          recordBall(total, true, selectedExtra, runsOffBat, forceExtraBall);
                         }}
                         disabled={isScoringLocked}
                         className="w-full py-2.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/40 text-[11px] font-bold text-amber-400 uppercase tracking-wider rounded-xl cursor-pointer transition-all active:scale-[0.98] disabled:opacity-40 disabled:hover:bg-amber-500/10 disabled:hover:border-amber-500/20 disabled:cursor-not-allowed"

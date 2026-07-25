@@ -3,6 +3,8 @@ import { pb, getFileUrl, getTeamLogo } from '../services/pocketbase';
 import type { Match, Team, Inning, Delivery, Player, TournamentConfig, MatchVote } from '../services/pocketbase';
 import { Users, Trophy, X, Clock, ChevronRight, Sparkles, Flame, Medal, User, CloudRain, AlertTriangle, TrendingUp, BarChart2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getOrdinal } from '../services/bracketUtils';
+
 
 interface DragScrollContainerProps {
   children: React.ReactNode;
@@ -153,7 +155,10 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
       let label = `${d.runs}`;
       let badgeClass = "bg-slate-800 text-slate-300 border border-slate-700/60";
 
-      if (d.is_wicket) {
+      if (d.dismissal_type === 'Retired Out') {
+        label = "Ret";
+        badgeClass = "bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold";
+      } else if (d.is_wicket) {
         if (d.dismissal_type === 'Run Out') {
           const deliveryInning = allInnings.find(i => i.id === d.inning);
           const deliveryMatch = deliveryInning ? matches.find(m => m.id === deliveryInning.match) : null;
@@ -216,7 +221,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
         chronoItems.push({
           type: 'over-divider',
           id: `div-${d.over_number}`,
-          label: `${d.over_number + 1}th`,
+          label: getOrdinal(d.over_number + 1),
           badgeClass: "",
           overNum: d.over_number + 1,
           overRuns
@@ -234,7 +239,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
           chronoItems.push({
             type: 'over-divider',
             id: `div-${lastDel.over_number}`,
-            label: `${lastDel.over_number + 1}th`,
+            label: getOrdinal(lastDel.over_number + 1),
             badgeClass: "",
             overNum: lastDel.over_number + 1,
             overRuns
@@ -617,7 +622,10 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
 
       const isWide = d.extra_type === 'Wide';
       const isNoBall = d.extra_type === 'No Ball';
-      const isLegal = isSpecialExtras ? true : (!isWide && !isNoBall);
+      const isRetiredOut = d.dismissal_type === 'Retired Out';
+      const isLegal = isRetiredOut 
+        ? false 
+        : (isSpecialExtras ? (d.ball_number > 0) : (!isWide && !isNoBall));
 
       if (isLegal) {
         totalBalls += 1;
@@ -648,7 +656,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
 
       // Striker stats
       if (d.striker) {
-        if (!isWide) {
+        if (!isWide && d.dismissal_type !== 'Retired Out') {
           batsmanRuns[d.striker] = (batsmanRuns[d.striker] || 0) + runOffBat;
           batsmanBalls[d.striker] = (batsmanBalls[d.striker] || 0) + 1;
 
@@ -661,7 +669,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
         currentStrikerId = d.striker;
 
         // Dismissal mapping
-        if (d.is_wicket && d.out_player) {
+        if ((d.is_wicket || d.dismissal_type === 'Retired Out') && d.out_player) {
           const bowlerName = d.expand?.bawler?.name || 'Bowler';
           const fielderName = d.expand?.fielder?.name || 'Fielder';
 
@@ -685,7 +693,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
 
       // Bowler stats
       if (d.bawler) {
-        if (isLegal) {
+        if (isLegal && d.dismissal_type !== 'Retired Out') {
           bowlerBalls[d.bawler] = (bowlerBalls[d.bawler] || 0) + 1;
         }
         if (d.extra_type !== 'Bye' && d.extra_type !== 'Leg Bye') {
@@ -1065,7 +1073,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
       } else if (d.dismissal_type === 'Hit Wicket') {
         msg = 'OUT! Hit Wicket.';
       } else if (d.dismissal_type === 'Retired Out') {
-        msg = 'OUT! Retired Out.';
+        msg = 'Retired Out. Batter leaves the field to the dugout (no ball consumed).';
       } else {
         msg = 'OUT!';
       }
@@ -1091,10 +1099,15 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
       if (d.extra_type === 'Wide') {
         const baseWide = isSpecialExtras ? 4 : 1;
         const completed = runs - baseWide;
+        const isReBowl = d.ball_number === 0;
         return isSpecialExtras
-          ? (completed > 0
-            ? `Wide. Batters ran ${completed} bye(s) (${runs} runs total, counted as legal ball).`
-            : `Wide (4 runs, counted as legal ball).`)
+          ? (isReBowl
+            ? (completed > 0
+              ? `Wide. Batters ran ${completed} bye(s) (${runs} runs total, extra ball required).`
+              : `Wide (4 runs, extra ball required).`)
+            : (completed > 0
+              ? `Wide. Batters ran ${completed} bye(s) (${runs} runs total, counted as legal ball).`
+              : `Wide (4 runs, counted as legal ball).`))
           : (completed > 0
             ? `Wide. Batters ran ${completed} bye(s) (${runs} runs total).`
             : `Wide. 1 run total.`);
@@ -1104,16 +1117,29 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
         const runOffBat = d.runs_off_bat !== undefined && d.runs_off_bat !== null
           ? d.runs_off_bat
           : (isSpecialExtras ? Math.max(0, runs - 6) : Math.max(0, runs - 1));
+        const isReBowl = d.ball_number === 0;
 
         if (isSpecialExtras) {
-          if (completed > 0) {
-            if (runOffBat > 0) {
-              return `No Ball. Batsman scored ${runOffBat} run(s) off bat (${runs} runs total, counted as legal ball).`;
+          if (isReBowl) {
+            if (completed > 0) {
+              if (runOffBat > 0) {
+                return `No Ball. Batsman scored ${runOffBat} run(s) off bat (${runs} runs total, extra ball required).`;
+              } else {
+                return `No Ball. Batters ran ${completed} bye(s) (${runs} runs total, extra ball required).`;
+              }
             } else {
-              return `No Ball. Batters ran ${completed} bye(s) (${runs} runs total, counted as legal ball).`;
+              return `No Ball (6 runs, extra ball required).`;
             }
           } else {
-            return `No Ball (6 runs, counted as legal ball).`;
+            if (completed > 0) {
+              if (runOffBat > 0) {
+                return `No Ball. Batsman scored ${runOffBat} run(s) off bat (${runs} runs total, counted as legal ball).`;
+              } else {
+                return `No Ball. Batters ran ${completed} bye(s) (${runs} runs total, counted as legal ball).`;
+              }
+            } else {
+              return `No Ball (6 runs, counted as legal ball).`;
+            }
           }
         } else {
           if (completed > 0) {
@@ -1525,6 +1551,12 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
                 <span>{formatMatchTime(liveMatch.match_time)}</span>
               </span>
             )}
+            {/* Live watching counter badge */}
+            <span className="flex items-center gap-1.5 text-[10px] font-extrabold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 ml-auto shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <Users className="w-3 h-3 text-emerald-400" />
+              <span>{Math.max(14, (votes.filter(v => v.match === liveMatch.id).length * 3) + (liveDeliveries.length % 9) + 12)} Watching</span>
+            </span>
           </div>
 
           <div
@@ -1885,6 +1917,159 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
               );
             })()}
 
+            {/* Live Inning Analytics & Projections Grid */}
+            {activeInning && (() => {
+              const innDels = liveDeliveries.filter(d => d.inning === activeInning.id);
+              if (innDels.length === 0) return null;
+
+              let totalRuns = 0;
+              let totalWkts = 0;
+              let legalBalls = 0;
+              let fours = 0;
+              let sixes = 0;
+              let dotBalls = 0;
+              let wides = 0;
+              let noBalls = 0;
+              let byes = 0;
+              let legByes = 0;
+
+              let powerplayRuns = 0, powerplayBalls = 0, powerplayWkts = 0;
+              let middleRuns = 0, middleBalls = 0, middleWkts = 0;
+              let deathRuns = 0, deathBalls = 0, deathWkts = 0;
+
+              innDels.forEach(d => {
+                const runs = d.runs || 0;
+                totalRuns += runs;
+                if (d.is_wicket && d.dismissal_type !== 'Retired Out') totalWkts += 1;
+
+                const isWide = d.extra_type === 'Wide';
+                const isNoBall = d.extra_type === 'No Ball';
+                const isSpecialExtras = liveMatch?.special_extras || false;
+                const isLegal = d.dismissal_type === 'Retired Out' ? false : (isSpecialExtras ? (d.ball_number > 0) : (!isWide && !isNoBall));
+
+                if (isLegal) legalBalls += 1;
+
+                if (d.runs_off_bat === 4) fours += 1;
+                if (d.runs_off_bat === 6) sixes += 1;
+                if (runs === 0 && d.extra_type === 'None') dotBalls += 1;
+
+                if (isWide) wides += (isSpecialExtras ? 4 : 1);
+                else if (isNoBall) noBalls += (isSpecialExtras ? 6 : 1);
+                else if (d.extra_type === 'Bye') byes += runs;
+                else if (d.extra_type === 'Leg Bye') legByes += runs;
+
+                const overNum = d.over_number || 0;
+                if (overNum < 2) {
+                  powerplayRuns += runs;
+                  if (isLegal) powerplayBalls += 1;
+                  if (d.is_wicket && d.dismissal_type !== 'Retired Out') powerplayWkts += 1;
+                } else if (overNum < 4) {
+                  middleRuns += runs;
+                  if (isLegal) middleBalls += 1;
+                  if (d.is_wicket && d.dismissal_type !== 'Retired Out') middleWkts += 1;
+                } else {
+                  deathRuns += runs;
+                  if (isLegal) deathBalls += 1;
+                  if (d.is_wicket && d.dismissal_type !== 'Retired Out') deathWkts += 1;
+                }
+              });
+
+              const boundaryRuns = (fours * 4) + (sixes * 6);
+              const boundaryPct = totalRuns > 0 ? Math.round((boundaryRuns / totalRuns) * 100) : 0;
+              const crrVal = legalBalls > 0 ? (totalRuns / (legalBalls / 6)) : 0;
+              const crrStr = crrVal.toFixed(2);
+
+              const totalLimit = (liveMatch?.overs_limit || 5) * 6;
+              const remBalls = Math.max(0, totalLimit - legalBalls);
+              const projCurrent = Math.round(totalRuns + (crrVal * (remBalls / 6)));
+              const proj10 = Math.round(totalRuns + (10.0 * (remBalls / 6)));
+              const proj12 = Math.round(totalRuns + (12.0 * (remBalls / 6)));
+
+              const ppRR = powerplayBalls > 0 ? ((powerplayRuns / powerplayBalls) * 6).toFixed(1) : '0.0';
+              const midRR = middleBalls > 0 ? ((middleRuns / middleBalls) * 6).toFixed(1) : '0.0';
+              const dthRR = deathBalls > 0 ? ((deathRuns / deathBalls) * 6).toFixed(1) : '0.0';
+
+              return (
+                <div className="mt-4 pt-4 border-t border-slate-800/60 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                      Live Analytics & Projections
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-bold">
+                      CRR: <span className="text-emerald-400 font-black text-xs">{crrStr}</span>
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs">
+                    {/* Phase Breakdown */}
+                    <div className="bg-slate-950/80 border border-slate-800/80 p-3 rounded-2xl space-y-1.5">
+                      <span className="text-[9px] text-slate-500 font-black uppercase tracking-wider block border-b border-slate-900 pb-1">
+                        Phase Performance
+                      </span>
+                      <div className="grid grid-cols-3 gap-1 text-center text-[10px]">
+                        <div className="bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
+                          <span className="text-slate-500 block text-[8px] font-black uppercase">PP (0-2)</span>
+                          <span className="font-black text-white block mt-0.5">{powerplayRuns}/{powerplayWkts}</span>
+                          <span className="text-[8px] text-emerald-400 block font-bold mt-0.5">RR {ppRR}</span>
+                        </div>
+                        <div className="bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
+                          <span className="text-slate-500 block text-[8px] font-black uppercase">MID (2-4)</span>
+                          <span className="font-black text-white block mt-0.5">{middleRuns}/{middleWkts}</span>
+                          <span className="text-[8px] text-emerald-400 block font-bold mt-0.5">RR {midRR}</span>
+                        </div>
+                        <div className="bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
+                          <span className="text-slate-500 block text-[8px] font-black uppercase">DEATH (4-5)</span>
+                          <span className="font-black text-white block mt-0.5">{deathRuns}/{deathWkts}</span>
+                          <span className="text-[8px] text-emerald-400 block font-bold mt-0.5">RR {dthRR}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Boundaries & Extras */}
+                    <div className="bg-slate-950/80 border border-slate-800/80 p-3 rounded-2xl space-y-1.5">
+                      <span className="text-[9px] text-slate-500 font-black uppercase tracking-wider block border-b border-slate-900 pb-1">
+                        Boundaries & Extras
+                      </span>
+                      <div className="flex items-center justify-between text-[10px] pt-0.5">
+                        <span className="text-slate-400 font-semibold">Boundaries:</span>
+                        <span className="font-black text-amber-400">{fours}x4 | {sixes}x6 ({boundaryRuns} runs)</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-slate-400 font-semibold">Boundary %:</span>
+                        <span className="font-extrabold text-emerald-400">{boundaryPct}% of score</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-slate-400 font-semibold">Dot Balls:</span>
+                        <span className="font-extrabold text-slate-300">{dotBalls} dots</span>
+                      </div>
+                    </div>
+
+                    {/* Score Projections */}
+                    <div className="bg-slate-950/80 border border-slate-800/80 p-3 rounded-2xl space-y-1.5">
+                      <span className="text-[9px] text-slate-500 font-black uppercase tracking-wider block border-b border-slate-900 pb-1">
+                        Projected Score
+                      </span>
+                      <div className="grid grid-cols-3 gap-1 text-center text-[10px]">
+                        <div className="bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
+                          <span className="text-slate-500 block text-[8px] font-black uppercase">Current RR</span>
+                          <span className="font-black text-emerald-400 block mt-0.5 text-xs">{projCurrent}</span>
+                        </div>
+                        <div className="bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
+                          <span className="text-slate-500 block text-[8px] font-black uppercase">10.0 RR</span>
+                          <span className="font-black text-amber-400 block mt-0.5 text-xs">{proj10}</span>
+                        </div>
+                        <div className="bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
+                          <span className="text-slate-500 block text-[8px] font-black uppercase">12.0 RR</span>
+                          <span className="font-black text-violet-400 block mt-0.5 text-xs">{proj12}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Voting Panel */}
             {liveMatch && (() => {
               const t1 = getTeam(liveMatch.team1);
@@ -1917,28 +2102,35 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
               return (
                 <div className="mt-4 pt-4 border-t border-slate-800/40 space-y-3" onClick={(e) => e.stopPropagation()}>
                   <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    <span>Win Probability (Audience Poll)</span>
+                    <span className="flex items-center gap-1.5">
+                      <span>Win Probability (Audience Poll)</span>
+                      <span className="text-emerald-400 font-extrabold text-[9px] bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">{totalVotes} {totalVotes === 1 ? 'Vote' : 'Votes'}</span>
+                    </span>
                     <span>{isVotingLocked ? '🔒 Voting Closed' : '🗳️ Live Voting'}</span>
                   </div>
 
-                  {/* Percentage split bar */}
+                  {/* Percentage split bar with vote counts */}
                   <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-black text-slate-400 w-10 text-left">{t1.short_name}</span>
+                    <span className="text-[10px] font-black text-slate-400 w-12 text-left shrink-0">
+                      {t1.short_name} <span className="text-emerald-400 block text-[9px] font-bold">{votesT1} v</span>
+                    </span>
                     <div className="flex-1 h-5 bg-slate-950 rounded-full overflow-hidden flex border border-slate-850">
                       <div 
-                        className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full flex items-center justify-start pl-3 text-[9px] font-black text-slate-950 transition-all duration-500"
+                        className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full flex items-center justify-start pl-2 text-[9px] font-black text-slate-950 transition-all duration-500 whitespace-nowrap"
                         style={{ width: `${pctT1}%` }}
                       >
-                        {pctT1 >= 15 && `${pctT1}%`}
+                        {pctT1 >= 10 && `${pctT1}% (${votesT1})`}
                       </div>
                       <div 
-                        className="bg-gradient-to-r from-violet-600 to-indigo-500 h-full flex items-center justify-end pr-3 text-[9px] font-black text-white transition-all duration-500"
+                        className="bg-gradient-to-r from-violet-600 to-indigo-500 h-full flex items-center justify-end pr-2 text-[9px] font-black text-white transition-all duration-500 whitespace-nowrap"
                         style={{ width: `${pctT2}%` }}
                       >
-                        {pctT2 >= 15 && `${pctT2}%`}
+                        {pctT2 >= 10 && `${pctT2}% (${votesT2})`}
                       </div>
                     </div>
-                    <span className="text-[10px] font-black text-slate-400 w-10 text-right">{t2.short_name}</span>
+                    <span className="text-[10px] font-black text-slate-400 w-12 text-right shrink-0">
+                      {t2.short_name} <span className="text-violet-400 block text-[9px] font-bold">{votesT2} v</span>
+                    </span>
                   </div>
 
                   {/* Vote Buttons */}

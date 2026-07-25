@@ -24,7 +24,7 @@ export const parseStage = (stageName: string): ParsedStage => {
     const idx = parseInt(stageName.replace('Round of 32 - Match ', '')) || 1;
     return { round: 5, matchIndex: idx, name: `Round of 32 - Match ${idx}` };
   }
-  return { round: 1, matchIndex: 1, name: stageName };
+  return { round: 99, matchIndex: 1, name: stageName };
 };
 
 export const getRoundName = (round: number): string => {
@@ -46,3 +46,10 @@ export const getStageName = (round: number, matchIndex: number): string => {
   if (round === 5) return `Round of 32 - Match ${matchIndex}`;
   return `Round ${round} - Match ${matchIndex}`;
 };
+
+export const getOrdinal = (n: number): string => {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+};
+

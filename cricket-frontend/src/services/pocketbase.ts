@@ -285,6 +285,7 @@ export interface TournamentConfig {
   mos_performance?: string;
   show_epf_number?: boolean;
   strict_fantasy_roles?: boolean;
+  stats_from_phase?: 'All' | 'Quarter Finals' | 'Semi Finals';
   created?: string;
   updated?: string;
   expand?: {
