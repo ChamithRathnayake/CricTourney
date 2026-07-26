@@ -48,7 +48,7 @@ export const StatsLeaderboard: React.FC<StatsLeaderboardProps> = ({ players, tea
   const [isLoading, setIsLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState<'caps' | 'analytics'>('caps');
 
-  const phaseSetting = tournamentConfig?.stats_from_phase || 'All';
+  const phaseSetting = tournamentConfig?.stats_from_phase || (localStorage.getItem('stats_from_phase') as any) || 'All';
 
   // Filter deliveries by tournament phase setting
   const filteredDeliveries = React.useMemo(() => {

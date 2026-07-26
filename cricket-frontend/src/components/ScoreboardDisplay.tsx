@@ -34,7 +34,7 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
   const isTournamentEnded = finalMatch?.status === 'Completed';
   const championTeam = finalMatch ? teams.find(t => t.id === finalMatch.winner) : null;
 
-  const phaseSetting = tournamentConfig?.stats_from_phase || 'All';
+  const phaseSetting = tournamentConfig?.stats_from_phase || (localStorage.getItem('stats_from_phase') as any) || 'All';
 
   // Filter deliveries by tournament phase setting for accolade calculations
   const filteredDeliveries = React.useMemo(() => {

@@ -210,7 +210,11 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
       setMosPerformance(tournamentConfig.mos_performance || '');
       setShowEpfNumber(!!tournamentConfig.show_epf_number);
       setStrictFantasyRoles(tournamentConfig.strict_fantasy_roles !== false);
-      setStatsFromPhase(tournamentConfig.stats_from_phase || 'All');
+      const phaseVal = tournamentConfig.stats_from_phase || (localStorage.getItem('stats_from_phase') as any) || 'All';
+      setStatsFromPhase(phaseVal);
+      if (tournamentConfig.stats_from_phase) {
+        localStorage.setItem('stats_from_phase', tournamentConfig.stats_from_phase);
+      }
     }
   }, [tournamentConfig]);
 
@@ -3799,6 +3803,7 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                   onChange={async (e) => {
                     const newPhase = e.target.value as 'All' | 'Quarter Finals' | 'Semi Finals';
                     setStatsFromPhase(newPhase);
+                    localStorage.setItem('stats_from_phase', newPhase);
                     setIsSavingConfig(true);
                     setErrorMsg('');
                     setSuccessMsg('');
