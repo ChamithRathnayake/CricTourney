@@ -1937,6 +1937,37 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
               let middleRuns = 0, middleBalls = 0, middleWkts = 0;
               let deathRuns = 0, deathBalls = 0, deathWkts = 0;
 
+              const totalOversLimit = liveMatch?.overs_limit || 5;
+
+              // Dynamic phase thresholds based on match overs limit
+              let ppEndOver = 2;
+              let deathStartOver = 4;
+
+              if (totalOversLimit <= 2) {
+                ppEndOver = 1;
+                deathStartOver = 1;
+              } else if (totalOversLimit <= 6) {
+                ppEndOver = 2;
+                deathStartOver = 4;
+              } else if (totalOversLimit <= 10) {
+                ppEndOver = 3;
+                deathStartOver = 7;
+              } else if (totalOversLimit <= 15) {
+                ppEndOver = 4;
+                deathStartOver = 11;
+              } else {
+                ppEndOver = 6;
+                deathStartOver = 15;
+              }
+
+              const ppLabel = ppEndOver === 1 ? 'PP (Ov 1)' : `PP (Ov 1-${ppEndOver})`;
+              const midLabel = (ppEndOver + 1 >= deathStartOver)
+                ? `MID (Ov ${ppEndOver})`
+                : `MID (Ov ${ppEndOver + 1}-${deathStartOver})`;
+              const deathLabel = (deathStartOver + 1 >= totalOversLimit)
+                ? `DEATH (Ov ${totalOversLimit})`
+                : `DEATH (Ov ${deathStartOver + 1}-${totalOversLimit})`;
+
               innDels.forEach(d => {
                 const runs = d.runs || 0;
                 totalRuns += runs;
@@ -1959,11 +1990,11 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
                 else if (d.extra_type === 'Leg Bye') legByes += runs;
 
                 const overNum = d.over_number || 0;
-                if (overNum < 2) {
+                if (overNum < ppEndOver) {
                   powerplayRuns += runs;
                   if (isLegal) powerplayBalls += 1;
                   if (d.is_wicket && d.dismissal_type !== 'Retired Out') powerplayWkts += 1;
-                } else if (overNum < 4) {
+                } else if (overNum < deathStartOver) {
                   middleRuns += runs;
                   if (isLegal) middleBalls += 1;
                   if (d.is_wicket && d.dismissal_type !== 'Retired Out') middleWkts += 1;
@@ -1979,7 +2010,7 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
               const crrVal = legalBalls > 0 ? (totalRuns / (legalBalls / 6)) : 0;
               const crrStr = crrVal.toFixed(2);
 
-              const totalLimit = (liveMatch?.overs_limit || 5) * 6;
+              const totalLimit = totalOversLimit * 6;
               const remBalls = Math.max(0, totalLimit - legalBalls);
               const projCurrent = Math.round(totalRuns + (crrVal * (remBalls / 6)));
               const proj10 = Math.round(totalRuns + (10.0 * (remBalls / 6)));
@@ -2009,17 +2040,17 @@ export const LiveScorecard: React.FC<LiveScorecardProps> = ({ matches, teams, pl
                       </span>
                       <div className="grid grid-cols-3 gap-1 text-center text-[10px]">
                         <div className="bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
-                          <span className="text-slate-500 block text-[8px] font-black uppercase">PP (0-2)</span>
+                          <span className="text-slate-500 block text-[8px] font-black uppercase">{ppLabel}</span>
                           <span className="font-black text-white block mt-0.5">{powerplayRuns}/{powerplayWkts}</span>
                           <span className="text-[8px] text-emerald-400 block font-bold mt-0.5">RR {ppRR}</span>
                         </div>
                         <div className="bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
-                          <span className="text-slate-500 block text-[8px] font-black uppercase">MID (2-4)</span>
+                          <span className="text-slate-500 block text-[8px] font-black uppercase">{midLabel}</span>
                           <span className="font-black text-white block mt-0.5">{middleRuns}/{middleWkts}</span>
                           <span className="text-[8px] text-emerald-400 block font-bold mt-0.5">RR {midRR}</span>
                         </div>
                         <div className="bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
-                          <span className="text-slate-500 block text-[8px] font-black uppercase">DEATH (4-5)</span>
+                          <span className="text-slate-500 block text-[8px] font-black uppercase">{deathLabel}</span>
                           <span className="font-black text-white block mt-0.5">{deathRuns}/{deathWkts}</span>
                           <span className="text-[8px] text-emerald-400 block font-bold mt-0.5">RR {dthRR}</span>
                         </div>
