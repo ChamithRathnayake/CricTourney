@@ -4,6 +4,7 @@ import type { Match, Team, Player, Inning, Delivery, News, TournamentConfig } fr
 import { Settings, Play, Disc, RotateCcw, AlertTriangle, CheckCircle, Plus, Users, Edit, Trash2, Upload, FileSpreadsheet, X, Trophy, Check, Loader2, FileText } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { parseStage, getStageName, getRoundName, getOrdinal } from '../services/bracketUtils';
+import { compressImageFile } from '../utils/imageCompressor';
 
 
 interface DragScrollContainerProps {
@@ -2039,7 +2040,8 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
       formData.append('team', newPlayerTeamId);
       formData.append('epf_number', newPlayerEpf);
       if (newPlayerPhoto) {
-        formData.append('photo', newPlayerPhoto);
+        const compressed = await compressImageFile(newPlayerPhoto, 1024, 0.85);
+        formData.append('photo', compressed);
       }
 
       await pb.collection('players').create(formData);
@@ -2067,7 +2069,8 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
       formData.append('short_name', editTeamShortName);
       formData.append('captain', editTeamCaptainId || '');
       if (editTeamLogo) {
-        formData.append('logo', editTeamLogo);
+        const compressed = await compressImageFile(editTeamLogo, 1024, 0.85);
+        formData.append('logo', compressed);
       }
 
       await pb.collection('teams').update(editingTeam.id, formData);
@@ -2103,7 +2106,8 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
       formData.append('team', editPlayerTeamId);
       formData.append('epf_number', editPlayerEpf || '');
       if (editPlayerPhoto) {
-        formData.append('photo', editPlayerPhoto);
+        const compressed = await compressImageFile(editPlayerPhoto, 1024, 0.85);
+        formData.append('photo', compressed);
       }
 
       await pb.collection('players').update(editingPlayer.id, formData);
