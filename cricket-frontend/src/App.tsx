@@ -30,6 +30,14 @@ function App() {
     setIsAdmin(pb.authStore.isValid && pb.authStore.model !== null);
   };
 
+  // If user visits /pocketbase or /pocketbase/ before Nginx rewrites it, immediately redirect to /_/
+  useEffect(() => {
+    const path = window.location.pathname.toLowerCase();
+    if (path.startsWith('/pocketbase') || path.startsWith('/pb')) {
+      window.location.replace(`${window.location.origin}/_/`);
+    }
+  }, []);
+
   useEffect(() => {
     if (isAdmin) {
       const role = getUserRole();

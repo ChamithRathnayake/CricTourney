@@ -1,13 +1,13 @@
 import PocketBase from 'pocketbase';
 
 const getPocketBaseUrl = () => {
+  if (typeof window !== 'undefined' && window.location && window.location.origin) {
+    return window.location.origin;
+  }
   if (import.meta.env.VITE_PB_URL) {
     return import.meta.env.VITE_PB_URL;
   }
-  if (typeof window !== 'undefined') {
-    return window.location.origin;
-  }
-  return 'http://127.0.0.1:80';
+  return 'http://127.0.0.1:8080';
 };
 
 export const pb = new PocketBase(getPocketBaseUrl());
