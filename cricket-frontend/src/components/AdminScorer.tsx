@@ -3824,7 +3824,8 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                       }
                       setStatsFromPhase(newPhase);
                       localStorage.setItem('stats_from_phase', newPhase);
-                      setSuccessMsg(`Stats calculation phase set to "${newPhase}" globally across all devices!`);
+                      window.dispatchEvent(new Event('storage'));
+                      setSuccessMsg(`Stats calculation phase set to "${newPhase}"!`);
                       refreshData();
                     } catch (err: any) {
                       console.error('Failed to update stats_from_phase in PocketBase:', err);

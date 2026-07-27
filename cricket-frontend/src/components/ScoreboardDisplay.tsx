@@ -34,7 +34,20 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
   const isTournamentEnded = finalMatch?.status === 'Completed';
   const championTeam = finalMatch ? teams.find(t => t.id === finalMatch.winner) : null;
 
-  const phaseSetting = tournamentConfig?.stats_from_phase || 'All';
+  const [localPhase, setLocalPhase] = useState<'All' | 'Quarter Finals' | 'Semi Finals'>(() => {
+    return (localStorage.getItem('stats_from_phase') as any) || 'All';
+  });
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const stored = localStorage.getItem('stats_from_phase');
+      if (stored) setLocalPhase(stored as any);
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  const phaseSetting = tournamentConfig?.stats_from_phase || localPhase || 'All';
 
   // Filter deliveries by tournament phase setting for accolade calculations
   const filteredDeliveries = React.useMemo(() => {
