@@ -34,7 +34,7 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
   const isTournamentEnded = finalMatch?.status === 'Completed';
   const championTeam = finalMatch ? teams.find(t => t.id === finalMatch.winner) : null;
 
-  const phaseSetting = tournamentConfig?.stats_from_phase || (localStorage.getItem('stats_from_phase') as any) || 'All';
+  const phaseSetting = tournamentConfig?.stats_from_phase || 'All';
 
   // Filter deliveries by tournament phase setting for accolade calculations
   const filteredDeliveries = React.useMemo(() => {
@@ -87,15 +87,17 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
   useEffect(() => {
     fetchDisplayData();
 
-    // Subscribe to innings and deliveries for real-time LED updates
+    // Subscribe to innings, deliveries, and tournament_config for real-time updates
     pb.collection('innings').subscribe('*', () => fetchDisplayData());
     pb.collection('deliveries').subscribe('*', () => fetchDisplayData());
     pb.collection('match_votes').subscribe('*', () => fetchDisplayData());
+    pb.collection('tournament_config').subscribe('*', () => fetchDisplayData());
 
     return () => {
       pb.collection('innings').unsubscribe('*');
       pb.collection('deliveries').unsubscribe('*');
       pb.collection('match_votes').unsubscribe('*');
+      pb.collection('tournament_config').unsubscribe('*');
     };
   }, []);
 

@@ -3806,8 +3806,6 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                   value={statsFromPhase}
                   onChange={async (e) => {
                     const newPhase = e.target.value as 'All' | 'Quarter Finals' | 'Semi Finals';
-                    setStatsFromPhase(newPhase);
-                    localStorage.setItem('stats_from_phase', newPhase);
                     setIsSavingConfig(true);
                     setErrorMsg('');
                     setSuccessMsg('');
@@ -3824,10 +3822,13 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                       } else {
                         await pb.collection('tournament_config').create(data);
                       }
-                      setSuccessMsg(`Stats calculation phase set to "${newPhase}"!`);
+                      setStatsFromPhase(newPhase);
+                      localStorage.setItem('stats_from_phase', newPhase);
+                      setSuccessMsg(`Stats calculation phase set to "${newPhase}" globally across all devices!`);
                       refreshData();
                     } catch (err: any) {
-                      setErrorMsg(err.message || 'Error updating configuration.');
+                      console.error('Failed to update stats_from_phase in PocketBase:', err);
+                      setErrorMsg(err.message || 'Error updating configuration in PocketBase.');
                     } finally {
                       setIsSavingConfig(false);
                     }

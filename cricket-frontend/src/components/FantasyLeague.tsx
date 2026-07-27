@@ -173,7 +173,7 @@ export const FantasyLeague: React.FC<FantasyLeagueProps> = ({ players, teams, ma
   const isFinalCompleted = matches.some(m => m.stage === 'Final' && m.status === 'Completed');
   const isSquadLocked = isMatchLive || isFinalStarted;
 
-  const phaseSetting = tournamentConfig?.stats_from_phase || (localStorage.getItem('stats_from_phase') as any) || 'All';
+  const phaseSetting = tournamentConfig?.stats_from_phase || 'All';
 
   // Filter deliveries by tournament phase setting
   const filteredDeliveries = React.useMemo(() => {
