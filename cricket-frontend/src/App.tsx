@@ -89,7 +89,13 @@ function App() {
     pb.collection('news').subscribe('*', () => fetchData());
     pb.collection('tournament_config').subscribe('*', () => fetchData());
 
+    // Fallback polling interval (10s) in case Cloudflare HTTP/3 QUIC protocol drops real-time SSE stream
+    const pollInterval = setInterval(() => {
+      fetchData();
+    }, 10000);
+
     return () => {
+      clearInterval(pollInterval);
       pb.collection('matches').unsubscribe('*');
       pb.collection('teams').unsubscribe('*');
       pb.collection('players').unsubscribe('*');

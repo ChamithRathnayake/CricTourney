@@ -3860,6 +3860,16 @@ export const AdminScorer: React.FC<AdminScorerProps> = ({ matches, teams, player
                   </>
                 )}
               </button>
+
+              <a
+                href="/pocketbase/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full bg-slate-900/80 hover:bg-slate-900 text-slate-300 border border-slate-800 py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all shadow-md hover:text-emerald-400 hover:border-emerald-500/30 cursor-pointer mt-2"
+              >
+                <Settings className="w-4 h-4 text-emerald-400" />
+                <span>Open PocketBase Admin Console (/pocketbase/)</span>
+              </a>
             </div>
           </div>
 

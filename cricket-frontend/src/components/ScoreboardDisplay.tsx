@@ -106,7 +106,13 @@ export const ScoreboardDisplay: React.FC<ScoreboardDisplayProps> = ({
     pb.collection('match_votes').subscribe('*', () => fetchDisplayData());
     pb.collection('tournament_config').subscribe('*', () => fetchDisplayData());
 
+    // Fallback polling interval (4s) for LED Scoreboard Display in case Cloudflare drops SSE
+    const pollInterval = setInterval(() => {
+      fetchDisplayData();
+    }, 4000);
+
     return () => {
+      clearInterval(pollInterval);
       pb.collection('innings').unsubscribe('*');
       pb.collection('deliveries').unsubscribe('*');
       pb.collection('match_votes').unsubscribe('*');
